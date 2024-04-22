@@ -73,6 +73,8 @@ def draw_pieces(screen, board):
     :param gs:
     :return:
     """
+    for each in screen:
+        print(1)
 
 if __name__ == '__main__':
     main()
