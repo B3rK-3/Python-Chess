@@ -1,5 +1,5 @@
 """
-Main.py file is responsible for running the game. Will handle user input and GUI.
+Main.py file is responsible for running the game engine. Will handle user input and GUI.
 """
 import pygame as p
 from Chess import ChessEngine
