@@ -60,6 +60,9 @@ def main(): # Driver code for the main chess game
                     mpx, mpy = 1000, 1000
                     dragging = False
                     move.clear()
+            elif e.type == p.KEYDOWN:
+                if e.key == p.K_LEFT:
+                    gs.undoMove()
             p.display.flip()
         draw_game_state(screen, gs)
         clock.tick(MAX_FPS)
