@@ -31,38 +31,53 @@ def main(): # Driver code for the main chess game
     move = [] # two tuples [(7,7), (6,3)] will store where the user wants to move the piece to
     mpx = 0
     mpy = 0
+    vMoves = gs.genValidMoves()
+    print(vMoves)
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
+
             elif e.type == p.MOUSEBUTTONDOWN:
                 mx, my = p.mouse.get_pos()
                 if mx < HEIGHT and my < WIDTH:
                     mpx = mx//SQ_EACH_SIZE
                     mpy = my//SQ_EACH_SIZE
                     move.append((mpx, mpy))
-                    if len(move) == 2 and (move[0] == move[1]) or gs.board[move[0][1]][move[0][0]] == "__": # clears move if the tuples move[0] and move[1] are the same and if the last move was done by dragging also removes move if the first clik was void
+                    print(move)
+                if len(move) == 2:
+                    if ((move[1][1], move[1][0]),(move[0][1], move[0][0])) in vMoves: # making sure there were two clicks before
+                        moveC = ChessEngine.Move((move[0][1], move[0][0]), (move[1][1], move[1][0]), gs.board)
+                        gs.makeMove(moveC)
+                        vMoves = gs.genValidMoves() #gen new valid moves
+                        print(moveC.getChessNotation())
+                        dragging = True
                         move.clear()
-                if len(move) == 2: # making sure there were two clicks before
-                    moveC = ChessEngine.Move((move[0][1], move[0][0]), (move[1][1], move[1][0]), gs.board)
-                    gs.makeMove(moveC)
-                    print(moveC.getChessNotation())
-                    move.clear()
-                dragging = True
+                    elif gs.board[mpy][mpx] != '__':
+                        move = [(mpx, mpy)]
+                        print(move)
+                    else:
+                        move.clear()
+
             elif e.type == p.MOUSEBUTTONUP:
                 mx, my = p.mouse.get_pos()
                 my = my//SQ_EACH_SIZE
                 mx = mx//SQ_EACH_SIZE
                 if mpx < SIZE and mpy < SIZE and mx < HEIGHT and my < WIDTH and gs.board[mpy][mpx] != "__" and (mx,my) != (mpx, mpy): #make sure that the dragged is not empty and within bounds
                     #for the if condition the last condition makes sure that the we are not trying to drag it into the same place (it messes with the click move property)
-                    moveC = ChessEngine.Move((mpy, mpx), (my, mx), gs.board)
-                    gs.makeMove(moveC)
-                    mpx, mpy = 1000, 1000
-                    dragging = False
-                    move.clear()
+                    if ((my,mx),(mpy,mpx)) in vMoves:
+                        moveC = ChessEngine.Move((mpy, mpx), (my, mx), gs.board)
+                        gs.makeMove(moveC)
+                        vMoves = gs.genValidMoves() #gen new valid moves
+                        mpx, mpy = 1000, 1000
+                        dragging = False
+                        move.clear()
+
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_LEFT:
                     gs.undoMove()
+                    vMoves = gs.genValidMoves()  # gen new valid moves
+
             p.display.flip()
         draw_game_state(screen, gs)
         clock.tick(MAX_FPS)
