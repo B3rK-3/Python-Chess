@@ -37,140 +37,183 @@ class GameState():
 
     def genValidMoves(self):
         """"""
-        self.genPossibleMoves()
-        return self.possibleMoves
-    def genPossibleMoves(self):
+        def findInvalidMoves(i, kingPos):
+            moveP, fromP = self.posMoves[i]
+            # print(moveP, fromP)
+            board = [x[:] for x in self.board]
+            board[moveP[0]][moveP[1]] = board[fromP[0]][fromP[1]]
+            board[fromP[0]][fromP[1]] = "__"
+            self.white_turn = not self.white_turn
+            b1 = [x[0] for x in self.genPossibleMoves(board)]
+            if kingPos in b1:
+                self.posMoves.pop(i)
+            self.white_turn = not self.white_turn
+
+
+        self.posMoves = self.genPossibleMoves(self.board)
+        kingPos = self.findKingPos()
+
+        for i in range(len(self.posMoves)-1, -1, -1):
+            findInvalidMoves(i, kingPos)
+        return self.posMoves
+    def genPossibleMoves(self, board):
         """
         Method to generate the possible moves for a chess board depending on the move turn.
         """
-        self.possibleMoves = []
+        possibleMoves = []
         colors = ['w', 'b']
         turn = (0 if self.white_turn else 1)
-        for row in range(len(self.board)):
-            for col in range(len(self.board[0])):
-                b = self.board[row][col]
+        for row in range(len(board)):
+            for col in range(len(board[0])):
+                b = board[row][col]
                 if b[0] == colors[turn]:
                     if b[1] == 'P':
-                        self.pawnMoves(row, col, b)
+                        self.pawnMoves(row, col, b, board, possibleMoves)
                     elif b[1] == 'N':
-                        self.knightMoves(row, col, b)
+                        self.knightMoves(row, col, b, board, possibleMoves)
                     elif b[1] == 'R':
-                        self.rookMoves(row, col, b)
+                        self.rookMoves(row, col, b, board, possibleMoves)
                     elif b[1] == 'B':
-                        self.bishopMoves(row, col, b)
+                        self.bishopMoves(row, col, b, board, possibleMoves)
                     elif b[1] == 'Q':
-                        self.queenMoves(row, col, b)
+                        self.queenMoves(row, col, b, board, possibleMoves)
                     elif b[1] == 'K':
-                        self.kingMoves(row, col, b)
-    def pawnMoves(self, row, col, b):
+                        self.kingMoves(row, col, b, board, possibleMoves)
+        return possibleMoves
+    def pawnMoves(self, row, col, b, board, possibleMoves):
         """
         Check all of the possible moves for a pawn.
         """
         if b[0] == 'w':
-            if row == 6:  # To check if the pawn has never been moved therefore it can move 2
-                self.possibleMoves.append(((row - 2, col), (row, col)))
-            self.possibleMoves.append(((row - 1, col), (row, col)))
-            if col - 1 >= 0 and self.board[row-1][col-1][0] == 'b':
-                self.possibleMoves.append(((row - 1, col - 1), (row, col)))
-            if col + 1 < 8 and self.board[row-1][col+1][0] == 'b':
-                self.possibleMoves.append(((row - 1, col + 1), (row, col)))
+            if row == 6 and board[row-1][col] == "__" and board[row-2][col] == "__":  # To check if the pawn has never been moved therefore it can move 2
+                possibleMoves.append(((row - 2, col), (row, col)))
+            if board[row-1][col] == "__":
+                possibleMoves.append(((row - 1, col), (row, col)))
+            if col - 1 >= 0 and board[row-1][col-1][0] == 'b':
+                possibleMoves.append(((row - 1, col - 1), (row, col)))
+            if col + 1 < 8 and board[row-1][col+1][0] == 'b':
+                possibleMoves.append(((row - 1, col + 1), (row, col)))
         elif b[0] == 'b':
-            if row == 1:  # To check if the pawn has never been moved therefore it can move 2
-                self.possibleMoves.append(((row + 2, col), (row, col)))
-            self.possibleMoves.append(((row + 1, col), (row, col)))
-            if col - 1 >= 0 and self.board[row + 1][col - 1][0] == 'w':
-                self.possibleMoves.append(((row + 1, col - 1), (row, col)))
-            if col + 1 < 8 and self.board[row + 1][col + 1][0] == 'w':
-                self.possibleMoves.append(((row + 1, col + 1), (row, col)))
-    def knightMoves(self, row, col, b):
+            if row == 1 and board[row+1][col] == "__" and board[row+2][col] == '__':  # To check if the pawn has never been moved therefore it can move 2
+                possibleMoves.append(((row + 2, col), (row, col)))
+            if board[row+1][col] == "__":
+                possibleMoves.append(((row + 1, col), (row, col)))
+            if col - 1 >= 0 and board[row + 1][col - 1][0] == 'w':
+                possibleMoves.append(((row + 1, col - 1), (row, col)))
+            if col + 1 < 8 and board[row + 1][col + 1][0] == 'w':
+                possibleMoves.append(((row + 1, col + 1), (row, col)))
+    def knightMoves(self, row, col, b, board, possibleMoves):
         """
         Check all of the possible moves for a knight ps. there is max 8
         """
-        if row + 2 < 8 and col - 1 < 8 and self.board[row + 2][col-1][0] != b[0]:
-            self.possibleMoves.append(((row + 2, col - 1), (row, col)))
-        if row + 2 < 8 and col + 1 < 8 and self.board[row + 2][col+1][0] != b[0]:
-            self.possibleMoves.append(((row + 2, col + 1), (row, col)))
-        if row - 2 < 8 and col - 1 < 8 and self.board[row - 2][col-1][0] != b[0]:
-            self.possibleMoves.append(((row - 2, col - 1), (row, col)))
-        if row - 2 < 8 and col + 1 < 8 and self.board[row - 2][col+1][0] != b[0]:
-            self.possibleMoves.append(((row - 2, col + 1), (row, col)))
+        if row + 2 < 8 and col - 1 < 8 and board[row + 2][col-1][0] != b[0]:
+            possibleMoves.append(((row + 2, col - 1), (row, col)))
+        if row + 2 < 8 and col + 1 < 8 and board[row + 2][col+1][0] != b[0]:
+            possibleMoves.append(((row + 2, col + 1), (row, col)))
+        if row - 2 < 8 and col - 1 < 8 and board[row - 2][col-1][0] != b[0]:
+            possibleMoves.append(((row - 2, col - 1), (row, col)))
+        if row - 2 < 8 and col + 1 < 8 and board[row - 2][col+1][0] != b[0]:
+            possibleMoves.append(((row - 2, col + 1), (row, col)))
         # flip
-        if col + 2 < 8 and row - 1 < 8 and self.board[row - 1][col+2][0] != b[0]:
-            self.possibleMoves.append(((row - 1, col + 2), (row, col)))
-        if col + 2 < 8 and row + 1 < 8 and self.board[row + 1][col+2][0] != b[0]:
-            self.possibleMoves.append(((row + 1, col + 2), (row, col)))
-        if col - 2 < 8 and row - 1 < 8 and self.board[row - 1][col-2][0] != b[0]:
-            self.possibleMoves.append(((row - 1, col - 2), (row, col)))
-        if col - 2 < 8 and row + 1 < 8 and self.board[row + 1][col-2][0] != b[0]:
-            self.possibleMoves.append(((row + 1, col - 2), (row, col)))
-    def rookMoves(self, row, col, b):
+        if col + 2 < 8 and row - 1 < 8 and board[row - 1][col+2][0] != b[0]:
+            possibleMoves.append(((row - 1, col + 2), (row, col)))
+        if col + 2 < 8 and row + 1 < 8 and board[row + 1][col+2][0] != b[0]:
+            possibleMoves.append(((row + 1, col + 2), (row, col)))
+        if col - 2 < 8 and row - 1 < 8 and board[row - 1][col-2][0] != b[0]:
+            possibleMoves.append(((row - 1, col - 2), (row, col)))
+        if col - 2 < 8 and row + 1 < 8 and board[row + 1][col-2][0] != b[0]:
+            possibleMoves.append(((row + 1, col - 2), (row, col)))
+    def rookMoves(self, row, col, b, board, possibleMoves):
         """
         Generate all of the possible moves for a rook.
         """
         for i in range(7-row): # moves for downwards
-            if self.board[row + i + 1][col][0] != b[0]:
-                self.possibleMoves.append(((row + i + 1, col), (row, col)))
+            if board[row + i + 1][col][0] == b[0]:
+                break
+            possibleMoves.append(((row + i + 1, col), (row, col)))
+            if board[row + i + 1][col][0] != b[0] and board[row + i + 1][col][0] != '_':
+                break
         for i in range(row): # moves for upwards
-            if self.board[row - i - 1][col][0] != b[0]:
-                self.possibleMoves.append(((row - i - 1, col), (row, col)))
+            if board[row - i - 1][col][0] == b[0]:
+                break
+            possibleMoves.append(((row - i - 1, col), (row, col)))
+            if board[row - i - 1][col][0] != b[0] and board[row - i - 1][col][0] != '_':
+                break
         for i in range(7-col): # moves to the right
-            if self.board[row][col+i+1][0] != b[0]:
-                self.possibleMoves.append(((row, col + i + 1), (row, col)))
+            if board[row][col+i+1][0] == b[0]:
+                break
+            possibleMoves.append(((row, col + i + 1), (row, col)))
+            if board[row][col + i + 1][0] != b[0] and board[row][col + i + 1][0] != '_':
+                break
         for i in range(col): # moves to the left
-            if self.board[row][col-i-1][0] != b[0]:
-                self.possibleMoves.append(((row, col - i - 1), (row, col)))
-    def bishopMoves(self, row, col, b):
+            if board[row][col-i-1][0] == b[0]:
+                break
+            possibleMoves.append(((row, col - i - 1), (row, col)))
+            if board[row][col - i - 1][0] != b[0] and board[row][col - i - 1][0] != '_':
+                break
+    def bishopMoves(self, row, col, b, board, possibleMoves):
         """
         Generate all of the possible moves for a bishop.
         """
         for i in range(1, 8):
-            if col + i < 8 and row + i < 8 and self.board[row + i][col+i][0] != b[0]:
-                self.possibleMoves.append(((row+i,col+i),(row, col)))
-            if col + i < 8 and row - i >= 0 and self.board[row - i][col+i][0] != b[0]:
-                self.possibleMoves.append(((row-i,col+i),(row, col)))
-            if col - i >= 0 and row - i >= 0 and self.board[row - i][col-i][0] != b[0]:
-                self.possibleMoves.append(((row-i,col-i),(row, col)))
-            if col - i >= 0 and row + i < 8 and self.board[row + i][col-i][0] != b[0]:
-                self.possibleMoves.append(((row+i,col-i),(row, col)))
-    def queenMoves(self, row, col, b):
+            if col + i < 8 and row + i < 8:
+                if board[row + i][col + i][0] == b[0]:
+                    break
+                possibleMoves.append(((row+i,col+i),(row, col)))
+                if board[row + i][col + i][0] != b[0] and board[row + i][col + i][0] != "_":
+                    break
         for i in range(1, 8):
-            if col + i < 8 and row + i < 8 and self.board[row + i][col + i][0] != b[0]:
-                self.possibleMoves.append(((row + i, col + i), (row, col)))
-            if col + i < 8 and row - i >= 0 and self.board[row - i][col + i][0] != b[0]:
-                self.possibleMoves.append(((row - i, col + i), (row, col)))
-            if col - i >= 0 and row - i >= 0 and self.board[row - i][col - i][0] != b[0]:
-                self.possibleMoves.append(((row - i, col - i), (row, col)))
-            if col - i >= 0 and row + i < 8 and self.board[row + i][col - i][0] != b[0]:
-                self.possibleMoves.append(((row + i, col - i), (row, col)))
-        for i in range(7 - row):  # moves for downwards
-            if self.board[row + i + 1][col][0] != b[0]:
-                self.possibleMoves.append(((row + i + 1, col), (row, col)))
-        for i in range(row):  # moves for upwards
-            if self.board[row - i - 1][col][0] != b[0]:
-                self.possibleMoves.append(((row - i - 1, col), (row, col)))
-        for i in range(7 - col):  # moves to the right
-            if self.board[row][col + i + 1][0] != b[0]:
-                self.possibleMoves.append(((row, col + i + 1), (row, col)))
-        for i in range(col):  # moves to the left
-            if self.board[row][col - i - 1][0] != b[0]:
-                self.possibleMoves.append(((row, col - i - 1), (row, col)))
-    def kingMoves(self, row, col, b):
-        if col + 1 < 8 and row - 1 >= 0 and self.board[row - 1][col + 1][0] != b[0]:
-            self.possibleMoves.append(((row - 1, col + 1), (row, col)))
-        if col + 1 < 8 and row + 1 < 8 and self.board[row + 1][col + 1][0] != b[0]:
-            self.possibleMoves.append(((row + 1, col + 1), (row, col)))
-        if col - 1 >= 0 and row - 1 >= 0 and self.board[row - 1][col - 1][0] != b[0]:
-            self.possibleMoves.append(((row - 1, col - 1), (row, col)))
-        if col - 1 >= 0 and row + 1 < 8 and self.board[row + 1][col - 1][0] != b[0]:
-            self.possibleMoves.append(((row + 1, col - 1), (row, col)))
-        if row - 1 >= 0 and self.board[row - 1][col][0] != b[0]:
-            self.possibleMoves.append(((row - 1, col), (row, col)))
-        if col - 1 >= 0 and self.board[row][col - 1][0] != b[0]:
-            self.possibleMoves.append(((row, col - 1), (row, col)))
-        if row + 1 < 8 and self.board[row + 1][col][0] != b[0]:
-            self.possibleMoves.append(((row + 1, col), (row, col)))
-        if col + 1 < 8 and self.board[row][col + 1][0] != b[0]:
-            self.possibleMoves.append(((row, col + 1), (row, col)))
+            if col + i < 8 and row - i >= 0:
+                if board[row - i][col + i][0] == b[0]:
+                    break
+                possibleMoves.append(((row-i,col+i),(row, col)))
+                if board[row - i][col + i][0] != b[0] and board[row - i][col + i][0] != "_":
+                    break
+        for i in range(1, 8):
+            if col - i >= 0 and row - i >= 0:
+                if board[row - i][col-i][0] == b[0]:
+                    break
+                possibleMoves.append(((row-i,col-i),(row, col)))
+                if board[row - i][col - i][0] != b[0] and board[row - i][col - i][0] != "_":
+                    break
+        for i in range(1, 8):
+            if col - i >= 0 and row + i < 8:
+                if board[row + i][col-i][0] == b[0]:
+                    break
+                possibleMoves.append(((row+i,col-i),(row, col)))
+                if board[row + i][col - i][0] != b[0] and board[row + i][col - i][0] != "_":
+                    break
+    def queenMoves(self, row, col, b, board, possibleMoves):
+        self.bishopMoves(row, col, b, board, possibleMoves)
+        self.rookMoves(row, col, b, board, possibleMoves)
+    def kingMoves(self, row, col, b, board, possibleMoves):
+        if col + 1 < 8 and row - 1 >= 0 and board[row - 1][col + 1][0] != b[0]:
+            possibleMoves.append(((row - 1, col + 1), (row, col)))
+        if col + 1 < 8 and row + 1 < 8 and board[row + 1][col + 1][0] != b[0]:
+            possibleMoves.append(((row + 1, col + 1), (row, col)))
+        if col - 1 >= 0 and row - 1 >= 0 and board[row - 1][col - 1][0] != b[0]:
+            possibleMoves.append(((row - 1, col - 1), (row, col)))
+        if col - 1 >= 0 and row + 1 < 8 and board[row + 1][col - 1][0] != b[0]:
+            possibleMoves.append(((row + 1, col - 1), (row, col)))
+        if row - 1 >= 0 and board[row - 1][col][0] != b[0]:
+            possibleMoves.append(((row - 1, col), (row, col)))
+        if col - 1 >= 0 and board[row][col - 1][0] != b[0]:
+            possibleMoves.append(((row, col - 1), (row, col)))
+        if row + 1 < 8 and board[row + 1][col][0] != b[0]:
+            possibleMoves.append(((row + 1, col), (row, col)))
+        if col + 1 < 8 and board[row][col + 1][0] != b[0]:
+            possibleMoves.append(((row, col + 1), (row, col)))
+    def findKingPos(self):
+        kingPos = ()
+        for row in range(len(self.board)):
+            for col in range(len(self.board[0])):
+                if self.white_turn and self.board[row][col] == "wK":
+                    kingPos = (row, col)
+                    break
+                if not self.white_turn and self.board[row][col] == "bK":
+                    kingPos = (row, col)
+                    break
+        return kingPos
 
 
 
