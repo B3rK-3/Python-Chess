@@ -37,6 +37,7 @@ class GameState():
 
     def genValidMoves(self):
         """"""
+        """
         def findInvalidMoves(i, kingPos):
             moveP, fromP = self.posMoves[i]
             # print(moveP, fromP)
@@ -54,7 +55,15 @@ class GameState():
         kingPos = self.findKingPos()
 
         for i in range(len(self.posMoves)-1, -1, -1):
-            findInvalidMoves(i, kingPos)
+            findInvalidMoves(i, kingPos)"""
+        self.eatM = []  # eating moves to be the self.posMoves later on
+        self.posMoves = self.genPossibleMoves(self.board)
+        kingPos = self.findKingPos()
+        for i in range(len(self.posMoves)-1, -1, -1):
+           pPos = self.posMoves[i][1]
+           self.checkPin(pPos, kingPos, i)
+        if self.eatM:
+            self.posMoves = [] + self.eatM
         return self.posMoves
     def genPossibleMoves(self, board):
         """
@@ -214,6 +223,152 @@ class GameState():
                     kingPos = (row, col)
                     break
         return kingPos
+    def checkPin(self, pos, king, it):
+        """allM = [x[0] for x in self.posMoves] #all moves that we can move to
+        color = ('w' if king[0] == 'b' else 'b')
+        vMove = self.posMoves[it][0][0] - self.posMoves[it][1][0] #vertical move. can move up if neg and down if pos
+        hMove = self.posMoves[it][0][1] - self.posMoves[it][1][1] #horizontal move. can move left if neg and right if pos
+        #check horizontal and vertical
+
+        def checkVer():
+            for i in range(pos[0]+1,7-pos[0]): # moves for downwards
+                b = self.board[i][pos[1]]
+                if (b == color+'Q' or b == color+'R'): #check if rook or queen since only they can pin vertically and horizontally
+                    if (i, pos[1]) not in allM:
+                        popped = self.posMoves.pop(it)
+                    else:
+                        posM = [x if x[0] == (i,pos) else None for x in self.posMoves]
+                        print(posM)
+                        self.eatM.append(posM)
+                    if popped:
+                        return
+                elif b[0] !='__':
+                    break
+            for i in range(pos[0]-1,-1,-1): # moves for upwards
+                b = self.board[i][pos[1]]
+                if (b == color + 'Q' or b == color + 'R'):  # check if rook or queen since only they can pin vertically and horizontally
+                    if (i, pos[1]) not in allM:
+                        popped = self.posMoves.pop(it)
+                    else:
+                        posM = [x if x[0] == (i, pos[1]) else None for x in self.posMoves]
+                        print(posM)
+                        self.eatM.append(posM)
+                    if popped:
+                        return
+                elif b[0] != '__':
+                    break
+        def checkHor():
+            for i in range(pos[1]+1,7-pos[1]): # moves to the right
+                b = self.board[pos[0]][i]
+                if (b == color + 'Q' or b == color + 'R'):  # check if rook or queen since only they can pin vertically and horizontally
+                    if (pos[0], i) not in allM:
+                        popped = self.posMoves.pop(it)
+                    else:
+                        posM = [x if x[0] == (pos[0], i) else None for x in self.posMoves]
+                        print(posM)
+                        self.eatM.append(posM)
+                    if popped:
+                        return
+                elif b[0] != '__':
+                    break
+            for i in range(pos[1]-1,-1,-1): # moves to the left
+                b = self.board[pos[0]][i]
+                if (b == color + 'Q' or b == color + 'R'):  # check if rook or queen since only they can pin vertically and horizontally
+                    if (pos[0], i) not in allM:
+                        popped = self.posMoves.pop(it)
+                    else:
+                        posM = [x if x[0] == (pos[0], i) else None for x in self.posMoves]
+                        print(posM)
+                        self.eatM.append(posM)
+                    if popped:
+                        return
+                elif b[0] != '__':
+                    break
+        #check diagonally
+        def checkRU(): #right || up right and  bottom left
+            for i in range(1, 8):
+                col = pos[1] + i
+                row = pos[0] + i
+                if col < 8 and row < 8:
+                    b = self.board[row][col]
+                    if (
+                            b == color + 'Q' or b == color + 'B'):  # check if bishop or queen since only they can pin diagonally
+                        if (row, col) not in allM:
+                            popped = self.posMoves.pop(it)
+                        else:
+                            posM = [x if x[0] == (row, col) else None for x in self.posMoves]
+                            print(posM)
+                            self.eatM.append(posM)
+                        if popped:
+                            return
+                    elif b[0] != '__':
+                        break
+            for i in range(1, 8):
+                col = pos[1] + i
+                row = pos[0] - i
+                if col < 8 and row >= 0:
+                    if col >= 0 and row < 8:
+                        b = self.board[row][col]
+                        if (
+                                b == color + 'Q' or b == color + 'B'):  # check if bishop or queen since only they can pin diagonally
+                            if (row, col) not in allM:
+                                popped = self.posMoves.pop(it)
+                            else:
+                                posM = [x if x[0] == (row, col) else None for x in self.posMoves]
+                                print(posM)
+                                self.eatM.append(posM)
+                            if popped:
+                                return
+                        elif b[0] != '__':
+                            break
+        def checkLU():#left || down right and up left
+            for i in range(1, 8):
+                col = pos[1] - i
+                row = pos[0] - i
+                if col >= 0 and row >= 0:
+                    if col >= 0 and row < 8:
+                        b = self.board[row][col]
+                        if (
+                                b == color + 'Q' or b == color + 'B'):  # check if bishop or queen since only they can pin diagonally
+                            if (row, col) not in allM:
+                                popped = self.posMoves.pop(it)
+                            else:
+                                posM = [x if x[0] == (row, col) else None for x in self.posMoves]
+                                print(posM)
+                                self.eatM.append(posM)
+                            if popped:
+                                return
+                        elif b[0] != '__':
+                            break
+            for i in range(1, 8):
+                col = pos[1]-i
+                row = pos[0]+i
+                if col >= 0 and row < 8:
+                    b = self.board[row][col]
+                    if (b == color + 'Q' or b == color + 'B'):  # check if bishop or queen since only they can pin diagonally
+                        if (row, col) not in allM:
+                            popped = self.posMoves.pop(it)
+                        else:
+                            posM = [x if x[0] == (row, col) else None for x in self.posMoves]
+                            print(posM)
+                            self.eatM.append(posM)
+                        if popped:
+                            return
+                    elif b[0] != '__':
+                        break
+
+
+        if vMove == 0 and hMove:
+            checkVer()""" #Half written algorithm to check if it is pin.
+        #It can work if more conditions are added but I found an easier way to do it.
+        #The code will stay just in case. New Code ->>
+
+
+
+
+
+
+
 
 
 
