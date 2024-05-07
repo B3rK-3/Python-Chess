@@ -113,7 +113,7 @@ def draw_pieces(screen, board):
     """
     draw the pieces
     :param screen:
-    :param gs:
+    :param gs:1
     :return:
     """
     for r in range(SIZE):
