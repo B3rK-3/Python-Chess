@@ -379,7 +379,7 @@ class GameState():
                         break
 
     def remExBlock(self,r,c, vh, color):
-        if vh: #if vertical or horizontal
+        if vh: # if vertical or horizontal
             for i in range(len(self.posMoves)-1, -1, -1):
                 toM = self.posMoves[i]
                 if not (self.kingPos[0] < toM[0][0] <= r or self.kingPos[0] > toM[0][0] >= r or self.kingPos[1] < toM[0][1] <= c or self.kingPos[1] > toM[0][1] >= c) and self.board[toM[1][0]][toM[1][1]][1] != 'K': # if the piece that can be moved is not blocking the check then pop it
