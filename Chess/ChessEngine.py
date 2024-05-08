@@ -56,14 +56,11 @@ class GameState():
 
         for i in range(len(self.posMoves)-1, -1, -1):
             findInvalidMoves(i, kingPos)"""
-        self.eatM = []  # eating moves to be the self.posMoves later on
         self.posMoves = self.genPossibleMoves(self.board)
-        kingPos = self.findKingPos()
-        for i in range(len(self.posMoves)-1, -1, -1):
-           pPos = self.posMoves[i][1]
-           self.checkPin(pPos, kingPos, i)
-        if self.eatM:
-            self.posMoves = [] + self.eatM
+        self.kingPos = self.findKingPos()
+        self.checkAroundKing(self.kingPos)
+        if self.posMoves == []:
+            print("Checkmat!", ("Black wins" if not self.white_turn else "White wins"))
         return self.posMoves
     def genPossibleMoves(self, board):
         """
@@ -362,6 +359,48 @@ class GameState():
             checkVer()""" #Half written algorithm to check if it is pin.
         #It can work if more conditions are added but I found an easier way to do it.
         #The code will stay just in case. New Code ->>
+    def checkAroundKing(self, king):
+        color = self.board[king[0]][king[1]][0]
+        oColor = ('w' if color == 'b' else 'b')
+        kMoves = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, 1), (1, 1), (-1, -1), (1, -1))
+        for move in kMoves:
+            for i in range(1,8):
+                r_off = move[0] * i
+                c_off = move[1] * i
+                r = r_off + king[0]
+                c = c_off + king[1]
+                if 0 <= r < 8 and 0 <= c < 8:
+                    piece = self.board[r][c]
+                    if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
+                        self.remExBlock(r,c, True, color)
+                    if piece[0] == oColor and ((c_off != 0) and (r_off != 0)) and (piece[1] == 'B' or piece[1] == 'Q'):
+                        self.remExBlock(r, c, False, color)
+                    if piece[0] == oColor:
+                        break
+
+    def remExBlock(self,r,c, vh, color):
+        if vh: # if vertical or horizontal
+            for i in range(len(self.posMoves)-1, -1, -1):
+                toM = self.posMoves[i]
+                if not (self.kingPos[0] < toM[0][0] <= r or self.kingPos[0] > toM[0][0] >= r or self.kingPos[1] < toM[0][1] <= c or self.kingPos[1] > toM[0][1] >= c) and self.board[toM[1][0]][toM[1][1]][1] != 'K': # if the piece that can be moved is not blocking the check then pop it
+                    print(1)
+                    self.posMoves.pop(i)
+                if self.board[toM[1][0]][toM[1][1]][1] == 'K' and (toM[0][0] == r or toM[0][1] == c) and toM[0][0] != r and toM[0][1] != c: # if the king move is in the same row or column as the piece attacking then remove it
+                    print(2)
+                    self.posMoves.pop(i)
+        else:
+            for i in range(len(self.posMoves)-1, -1, -1):
+                toM = self.posMoves[i]
+                if not ((self.kingPos[0] < toM[0][0] <= r and self.kingPos[1] > toM[0][1] >= c) or (self.kingPos[0] > toM[0][0] >= r and self.kingPos[1] > toM[0][1] >= c) or (self.kingPos[0] > toM[0][0] >= r and self.kingPos[1] < toM[0][1] <= c) or (self.kingPos[0] < toM[0][0] <= r and self.kingPos[1] < toM[0][1] <= c)) and self.board[toM[1][0]][toM[1][1]][1] != 'K': # if it is not between the king and queen diagonally or orthogonally
+                    print(3,'\t', r, c)
+                    self.posMoves.pop(i)
+                if self.board[toM[1][0]][toM[1][1]][1] == 'K' and ((self.kingPos[0] < toM[0][0] <= r and self.kingPos[1] > toM[0][1] >= c) or (self.kingPos[0] > toM[0][0] >= r and self.kingPos[1] > toM[0][1] >= c) or (self.kingPos[0] > toM[0][0] >= r and self.kingPos[1] < toM[0][1] <= c) or (self.kingPos[0] < toM[0][0] <= r and self.kingPos[1] < toM[0][1] <= c)):
+                    print(4)
+                    self.posMoves.pop(i)
+
+
+
+
 
 
 
