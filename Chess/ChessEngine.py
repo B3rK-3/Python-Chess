@@ -375,7 +375,7 @@ class GameState():
                 r = r_off + king[0]
                 c = c_off + king[1]
                 if 0 <= r < 8 and 0 <= c < 8:
-                    # TODO ADD A WAY TO CHECK CHECK BY KNIGHT
+                    # TODO ADD A WAY TO CHECK CHECK BY KNIGHT!
                     piece = self.board[r][c]
                     if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
                         self.remMoves(r,c, True, color)
