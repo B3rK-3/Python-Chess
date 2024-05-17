@@ -114,22 +114,22 @@ class GameState():
         """
         Check all the possible moves for a knight ps. there is max 8
         """
-        if row + 2 < 8 and col - 1 < 8 and board[row + 2][col-1][0] != b[0]:
+        if row + 2 < 8 and col - 1 >= 0 and board[row + 2][col-1][0] != b[0]:
             possibleMoves.append(((row + 2, col - 1), (row, col)))
         if row + 2 < 8 and col + 1 < 8 and board[row + 2][col+1][0] != b[0]:
             possibleMoves.append(((row + 2, col + 1), (row, col)))
-        if row - 2 < 8 and col - 1 < 8 and board[row - 2][col-1][0] != b[0]:
+        if row - 2 >= 0 and col - 1 >= 0 and board[row - 2][col-1][0] != b[0]:
             possibleMoves.append(((row - 2, col - 1), (row, col)))
-        if row - 2 < 8 and col + 1 < 8 and board[row - 2][col+1][0] != b[0]:
+        if row - 2 >= 0 and col + 1 < 8 and board[row - 2][col+1][0] != b[0]:
             possibleMoves.append(((row - 2, col + 1), (row, col)))
         # flip
-        if col + 2 < 8 and row - 1 < 8 and board[row - 1][col+2][0] != b[0]:
+        if col + 2 < 8 and row - 1 >= 0 and board[row - 1][col+2][0] != b[0]:
             possibleMoves.append(((row - 1, col + 2), (row, col)))
         if col + 2 < 8 and row + 1 < 8 and board[row + 1][col+2][0] != b[0]:
             possibleMoves.append(((row + 1, col + 2), (row, col)))
-        if col - 2 < 8 and row - 1 < 8 and board[row - 1][col-2][0] != b[0]:
+        if col - 2 >= 0 and row - 1 >= 0 and board[row - 1][col-2][0] != b[0]:
             possibleMoves.append(((row - 1, col - 2), (row, col)))
-        if col - 2 < 8 and row + 1 < 8 and board[row + 1][col-2][0] != b[0]:
+        if col - 2 >= 0 and row + 1 < 8 and board[row + 1][col-2][0] != b[0]:
             possibleMoves.append(((row + 1, col - 2), (row, col)))
     def rookMoves(self, row, col, b, board, possibleMoves):
         """
@@ -365,43 +365,59 @@ class GameState():
         color = self.board[king[0]][king[1]][0]
         oColor = ('w' if color == 'b' else 'b')
         kMoves = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, 1), (1, 1), (-1, -1), (1, -1))
-        self.kingCantMoveWhere()
         ownColor = 0
         count = 0
-        for move in kMoves:
+        self.checkKnightcheck(oColor, self.kingPos)
+        self.kingCantMoveWhere()
+        for move in kMoves: #check all directions around the king
             for i in range(1,8):
                 r_off = move[0] * i
                 c_off = move[1] * i
                 r = r_off + king[0]
                 c = c_off + king[1]
                 if 0 <= r < 8 and 0 <= c < 8:
-                    # TODO ADD A WAY TO CHECK CHECK BY KNIGHT!
                     piece = self.board[r][c]
+                    if piece[0] == color:
+                        if ownColor == 1:
+                            break
+                        ownColor += 1
+                    elif piece[0] == oColor and ownColor == 1:
+                        print("entering pinned")
+                        self.pinned(self.kingPos[0], self.kingPos[1], move)
+                        break
                     if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
+                        print(r,c, "vh")
                         self.remMoves(r,c, True, color)
                         count += 1
                     elif piece[0] == oColor and ((c_off != 0) and (r_off != 0)) and (piece[1] == 'B' or piece[1] == 'Q'):
+                        print(r,c, "check around")
                         self.remMoves(r, c, False, color)
                         count += 1
                     if piece[0] == oColor:
                         break
-                    if piece[0] == color and ownColor != 1:
-                        ownColor += 1
-                        self.pinned(r, c, move)
-                    else: break
-                else: break
             ownColor = 0
         return count > 0
     def remMoves(self,r,c, vh, color):
         if vh: # if vertical or horizontal
-            for i in range(len(self.posMoves)-1, -1, -1):
-                toM = self.posMoves[i]
-                if not (self.kingPos[0] < toM[0][0] <= r or self.kingPos[0] > toM[0][0] >= r or self.kingPos[1] < toM[0][1] <= c or self.kingPos[1] > toM[0][1] >= c) and self.board[toM[1][0]][toM[1][1]][1] != 'K': # if the piece that can be moved is not blocking the check then pop it
-                    print(1)
-                    self.posMoves.pop(i)
-                if self.board[toM[1][0]][toM[1][1]][1] == 'K' and (toM[0][0] == r or toM[0][1] == c) and toM[0][0] != r and toM[0][1] != c: # if the king move is in the same row or column as the piece attacking then remove it
-                    print(2)
-                    self.posMoves.pop(i)
+            d_row = self.kingPos[0] - r
+            d_col = self.kingPos[1] - c
+            if d_row == 0:
+                for i in range(len(self.posMoves)-1, -1, -1):
+                    m = self.posMoves[i]
+                    if m[1] == self.kingPos and ((d_col > 0 and (m[0][0] == r and self.kingPos[1] > m[0][1] > c)) or (d_col < 0 and (m[0][0] == r and self.kingPos[1] < m[0][1] < c))):
+                        self.posMoves.pop(i)
+                    elif m[1] != self.kingPos and ((d_col > 0 and not (m[0][0] == r and self.kingPos[1] > m[0][1] >= c)) or (d_col < 0 and not (m[0][0] == r and self.kingPos[1] < m[0][1] <= c))):
+                        self.posMoves.pop(i)
+            if d_col == 0:
+                print(self.posMoves)
+                for i in range(len(self.posMoves)-1, -1, -1):
+                    m = self.posMoves[i]
+                    if m[1] == self.kingPos and ((d_row > 0 and (m[0][1] == c and self.kingPos[0] > m[0][0] > r)) or (d_row < 0 and (m[0][1] == c and m[0][0] != r))):
+                        print(m, d_row)
+                        self.posMoves.pop(i)
+                    elif m[1] != self.kingPos and ((d_row > 0 and not (m[0][1] == c and self.kingPos[0] > m[0][0] >= r)) or (d_row < 0 and not (m[0][1] == c and self.kingPos[0] < m[0][0] <= r))):
+                        self.posMoves.pop(i)
+
         else:
             d_row = self.kingPos[0] - r
             d_col = self.kingPos[1] - c
@@ -414,13 +430,17 @@ class GameState():
                 l+=1
             l+=1
             for i in range(len(self.posMoves) - 1, -1, -1):
-                print(self.posMoves[i])
+                print(self.posMoves[i], "remMoves", places)
                 if self.posMoves[i][1] == self.kingPos:
+                    print(1, self.posMoves[i])
                     if self.posMoves[i][0][0] == r and (self.posMoves[i][0][1] == c):
+                        print(2, self.posMoves[i])
                         continue
                     elif (self.posMoves[i][0] in places or self.posMoves[i][0] == (r+d_row*l,c+d_col*l)):
+                        print(3, self.posMoves[i])
                         self.posMoves.pop(i)
                 elif self.posMoves[i][0] not in places:
+                    print(4, self.posMoves[i])
                     self.posMoves.pop(i)
             """if not ((self.kingPos[0] <= toM[0][0] < r and self.kingPos[1] >= toM[0][1] > c) or (self.kingPos[0] >= toM[0][0] > r and self.kingPos[1] >= toM[0][1] > c) or (self.kingPos[0] >= toM[0][0] > r and self.kingPos[1] <= toM[0][1] < c) or (self.kingPos[0] <= toM[0][0] < r and self.kingPos[1] <= toM[0][1] < c)) and self.board[toM[1][0]][toM[1][1]][1] != 'K': # if it is not between the king and queen diagonally or orthogonally
                 print(3,'\t', r, c)
@@ -435,29 +455,12 @@ class GameState():
                 kingPossible.append(e)
         color = self.board[self.kingPos[0]][self.kingPos[1]][0]
         oColor = ('w' if color == 'b' else 'b')
-        kMoves = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, 1), (1, 1), (-1, -1), (1, -1))
         for e in kingPossible:
             king = self.posMoves[e][0]
-            print(king)
-            for move in kMoves:
-                for i in range(1, 8):
-                    r_off = move[0] * i
-                    c_off = move[1] * i
-                    r = r_off + king[0]
-                    c = c_off + king[1]
-                    if 0 <= r < 8 and 0 <= c < 8:
-                        piece = self.board[r][c]
-                        print(3, piece)
-                        if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
-                            self.posMoves.pop(e)
-                            break
-                        if piece[0] == oColor and ((c_off != 0) and (r_off != 0)) and (piece[1] == 'B' or piece[1] == 'Q'):
-                            self.posMoves.pop(e)
-                            break
-                        if piece[0] == color:
-                            break
+            print(king, "!!!")
     def pinned(self, r1, c1, move):
         def iterateRem(toRem):
+            print(toRem, '\n')
             for i in range(len(self.posMoves)-1, -1, -1):
                 p = self.posMoves[i]
                 if p[1] == toRem:
@@ -477,6 +480,26 @@ class GameState():
                     iterateRem((r1, c1))
                 if piece[0] == color or piece[0] == oColor:
                     break
+    def checkKnightcheck(self, oColor, kingPos):
+        posKnightPlaces = []
+        self.knightMoves(kingPos[0], kingPos[1], kingPos, self.board, posKnightPlaces)
+        posKnightPlaces = [x[0] for x in posKnightPlaces]
+        print(posKnightPlaces)
+        KnIsPresent = None
+        for r,c in posKnightPlaces:
+            if self.board[r][c] == oColor+'N':
+                KnIsPresent = (r,c)
+                break
+        if KnIsPresent:
+            print(1)
+            for i in range(len(self.posMoves)-1, -1, -1):
+                p = self.posMoves[i]
+                if p[0] != KnIsPresent and self.board[p[1][0]][p[1][1]][1] != 'K': #if the piece being checked is not king and it does not eat the Knight, pop it
+                    self.posMoves.pop(i)
+        else:
+            pass
+
+
 
 
 class Move():

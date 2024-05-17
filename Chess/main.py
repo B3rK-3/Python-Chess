@@ -32,7 +32,6 @@ def main(): # Driver code for the main chess game
     mpx = 0
     mpy = 0
     vMoves = gs.genValidMoves()
-    print(vMoves)
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
@@ -50,7 +49,6 @@ def main(): # Driver code for the main chess game
                         moveC = ChessEngine.Move((move[0][1], move[0][0]), (move[1][1], move[1][0]), gs.board)
                         gs.makeMove(moveC)
                         vMoves = gs.genValidMoves() #gen new valid moves
-                        print(moveC.getChessNotation())
                         dragging = True
                         move.clear()
                     elif gs.board[mpy][mpx] != '__':
