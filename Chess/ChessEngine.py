@@ -60,7 +60,7 @@ class GameState():
         self.kingPos = self.findKingPos()
         self.checkAroundKing(self.kingPos)
         if self.posMoves == [] and self.checkAroundKing(self.kingPos):
-            print("Checkmate!", ("Black wins" if not self.white_turn else "White wins"))
+            print("Checkmate!", ("Black wins!" if not self.white_turn else "White wins!"))
         elif self.posMoves == []:
             print("Stalemate!")
         return self.posMoves
