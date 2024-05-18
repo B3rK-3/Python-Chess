@@ -365,7 +365,7 @@ class GameState():
         color = self.board[king[0]][king[1]][0]
         oColor = ('w' if color == 'b' else 'b')
         kMoves = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, 1), (1, 1), (-1, -1), (1, -1))
-        ownColor = 0
+        ownColor = None
         count = 0
         self.checkKnightcheck(oColor, self.kingPos)
         self.kingCantMoveWhere()
@@ -378,12 +378,12 @@ class GameState():
                 if 0 <= r < 8 and 0 <= c < 8:
                     piece = self.board[r][c]
                     if piece[0] == color:
-                        if ownColor == 1:
+                        if ownColor:
                             break
-                        ownColor += 1
-                    elif piece[0] == oColor and ownColor == 1:
+                        ownColor = (r,c)
+                    elif piece[0] == oColor and ownColor:
                         print("entering pinned")
-                        self.pinned(self.kingPos[0], self.kingPos[1], move)
+                        self.pinned((r, c), ownColor, move, piece[1])
                         break
                     if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
                         print(r,c, "vh")
@@ -395,7 +395,7 @@ class GameState():
                         count += 1
                     if piece[0] == oColor:
                         break
-            ownColor = 0
+            ownColor = None
         return count > 0
     def remMoves(self,r,c, vh, color):
         if vh: # if vertical or horizontal
@@ -405,17 +405,20 @@ class GameState():
                 for i in range(len(self.posMoves)-1, -1, -1):
                     m = self.posMoves[i]
                     if m[1] == self.kingPos and ((d_col > 0 and (m[0][0] == r and self.kingPos[1] > m[0][1] > c)) or (d_col < 0 and (m[0][0] == r and self.kingPos[1] < m[0][1] < c))):
+                        print(m, d_row, "d_row check, peice move deleted")
                         self.posMoves.pop(i)
                     elif m[1] != self.kingPos and ((d_col > 0 and not (m[0][0] == r and self.kingPos[1] > m[0][1] >= c)) or (d_col < 0 and not (m[0][0] == r and self.kingPos[1] < m[0][1] <= c))):
+                        print(m, d_row, "d_row check, peice move deleted")
                         self.posMoves.pop(i)
             if d_col == 0:
                 print(self.posMoves)
                 for i in range(len(self.posMoves)-1, -1, -1):
                     m = self.posMoves[i]
                     if m[1] == self.kingPos and ((d_row > 0 and (m[0][1] == c and self.kingPos[0] > m[0][0] > r)) or (d_row < 0 and (m[0][1] == c and m[0][0] != r))):
-                        print(m, d_row)
+                        print(m, d_row, "d_col check, king move deleted")
                         self.posMoves.pop(i)
                     elif m[1] != self.kingPos and ((d_row > 0 and not (m[0][1] == c and self.kingPos[0] > m[0][0] >= r)) or (d_row < 0 and not (m[0][1] == c and self.kingPos[0] < m[0][0] <= r))):
+                        print(m, d_row, "d_col check, peice move deleted", (r,c))
                         self.posMoves.pop(i)
 
         else:
@@ -430,7 +433,7 @@ class GameState():
                 l+=1
             l+=1
             for i in range(len(self.posMoves) - 1, -1, -1):
-                print(self.posMoves[i], "remMoves", places)
+                print(self.posMoves[i], "remMoves diagonal", places)
                 if self.posMoves[i][1] == self.kingPos:
                     print(1, self.posMoves[i])
                     if self.posMoves[i][0][0] == r and (self.posMoves[i][0][1] == c):
@@ -458,28 +461,43 @@ class GameState():
         for e in kingPossible:
             king = self.posMoves[e][0]
             print(king, "!!!")
-    def pinned(self, r1, c1, move):
-        def iterateRem(toRem):
-            print(toRem, '\n')
-            for i in range(len(self.posMoves)-1, -1, -1):
-                p = self.posMoves[i]
-                if p[1] == toRem:
-                    self.posMoves.pop(i)
-        color = self.board[r1][c1][0]
-        oColor = ('w' if color == 'b' else 'b')
-        for i in range(1, 8):
-            r_off = move[0] * i
-            c_off = move[1] * i
-            r = r_off + r1
-            c = c_off + c1
-            if 0 <= r < 8 and 0 <= c < 8:
-                piece = self.board[r][c]
-                if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
-                    iterateRem((r1,c1))
-                elif piece[0] == oColor and ((c_off != 0) and (r_off != 0)) and (piece[1] == 'B' or piece[1] == 'Q'):
-                    iterateRem((r1, c1))
-                if piece[0] == color or piece[0] == oColor:
-                    break
+
+    def pinned(self, pinner, pinned, moveDir, piece):
+        """
+        This function checks if a piece is pinned to the king by a rook, bishop, or queen.
+        If it is pinned, it removes moves that involve the pinned piece if moving it would
+        expose the king to a check.
+        """
+        m_r = moveDir[0]
+        m_c = moveDir[1]
+        if m_r == 0 or m_c == 0:
+            if m_c == 0 and (piece == 'R' or piece == 'Q'):
+                for i in range(len(self.posMoves)-1,-1,-1):
+                    movePiece = self.posMoves[i][1]
+                    if movePiece == pinned:
+                        movePlace = self.posMoves[i][0]
+                        if movePiece[1] - movePlace[1] != 0:
+                            self.posMoves.pop(i)
+            elif m_r == 0 and (piece == 'B' or piece == 'Q'):
+                for i in range(len(self.posMoves)-1,-1,-1):
+                    movePiece = self.posMoves[i][1]
+                    if movePiece == pinned:
+                        movePlace = self.posMoves[i][0]
+                        if movePiece[0] - movePlace[0] != 0:
+                            print(2)
+                            self.posMoves.pop(i)
+        elif piece == 'Q' or piece == 'B':
+            for i in range(len(self.posMoves) - 1, -1, -1):
+                movePiece = self.posMoves[i][1]
+                if movePiece == pinned:
+                    movePlace = self.posMoves[i][0]
+                    pieceDir = (movePlace[0] / abs(movePlace[0]), movePlace[1] / abs(movePlace[1]))
+                    print(pieceDir, moveDir)
+                    if pieceDir != moveDir:
+                        print(2)
+                        self.posMoves.pop(i)
+
+
     def checkKnightcheck(self, oColor, kingPos):
         posKnightPlaces = []
         self.knightMoves(kingPos[0], kingPos[1], kingPos, self.board, posKnightPlaces)
