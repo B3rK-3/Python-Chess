@@ -71,9 +71,9 @@ def main(): # Driver code for the main chess game
                 mx = mx//SQ_EACH_SIZE
                 if mpx < SIZE and mpy < SIZE and mx < HEIGHT and my < WIDTH and gs.board[mpy][mpx] != "__" and (mx,my) != (mpx, mpy): #make sure that the dragged is not empty and within bounds
                     #for the if condition the last condition makes sure that the we are not trying to drag it into the same place (it messes with the click move property)
-                    if gs.board[move[0][0]][move[0][1]][1] == "P":
+                    if gs.board[mpy][mpx][1] == "P":
                         print("up")
-                        s = gs.is_en_passant(move)
+                        s = gs.is_en_passant(((mpy, mpx), (my, mx)))
                     if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
                         gs.castleMove((my, mx), (mpy, mpx))
                         dragging = False

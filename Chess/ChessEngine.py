@@ -31,12 +31,11 @@ class GameState():
             self.mLog.append(move)
             self.white_turn = not self.white_turn
         else:
-            self.board[move.startRow][move.startCol] = "__"
-            self.board[move.endRow][move.endCol] = move.pieceMoved
             self.board[move1.startRow][move1.startCol] = "__"
             self.board[move1.endRow][move1.endCol] = move1.pieceMoved
+            self.board[move.startRow][move.startCol] = "__"
+            self.board[move.endRow][move.endCol] = move.pieceMoved
             self.mLog.append((move, move1))
-
     def undoMove(self):
         if len(self.mLog) > 0:
             m = self.mLog.pop()
@@ -98,8 +97,10 @@ class GameState():
         if len(self.mLog) > 1:
             lastMove = self.mLog[-1]
             print("heere")
-            if not isinstance(lastMove, tuple) and lastMove.pieceMoved[1] == "P" and abs(lastMove.endRow - lastMove.startRow) == 2:
-                print(1)
+            if not isinstance(lastMove, tuple) and lastMove.pieceMoved[1] == "P" and abs(lastMove.endRow - lastMove.startRow) == 2 and move[1][1] == lastMove.endCol and move[0][0] == lastMove.endRow and ((self.white_turn and move[1][0]-lastMove.endRow == -1) or (not self.white_turn and move[1][0]-lastMove.endRow == 1)):
+                passer = Move(move[0], move[1], self.board)
+                passed = Move((lastMove.endRow,lastMove.endCol), (lastMove.endRow+(-1 if self.white_turn else 1),lastMove.endCol), self.board)
+                self.makeMove(passer, passed)
         else: return False
     def genValidMoves(self, board):
         """"""
@@ -126,7 +127,7 @@ class GameState():
         self.kingPos = self.findKingPos()
         self.checkAroundKing(self.kingPos)
         if self.posMoves == [] and self.checkAroundKing(self.kingPos):
-            print("Checkmate!", ("Black wins!" if not self.white_turn else "White wins!"))
+            print("Checkmate!", ("Black wins!" if self.white_turn else "White wins!"))
         elif self.posMoves == []:
             print("Stalemate!")
         return self.posMoves
@@ -428,6 +429,7 @@ class GameState():
         #It can work if more conditions are added, but I found an easier way to do it.
         #The code will stay just in case. New Code ->>
     def checkAroundKing(self, king):
+        print(self.kingPos)
         color = self.board[king[0]][king[1]][0]
         oColor = ('w' if color == 'b' else 'b')
         kMoves = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, 1), (1, 1), (-1, -1), (1, -1))
@@ -449,14 +451,21 @@ class GameState():
                             break
                         ownColor = (r,c)
                     elif piece[0] == oColor and ownColor:
+                        print("Pin: ", (r,c), "{", move,"} ", piece)
                         self.pinned((r, c), ownColor, move, piece[1])
+                        ownColor = None
                         break
                     if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
+                        print("Rem: ", (r, c), "{", move, "} ", piece[1])
                         self.remMoves(r,c, True, color)
                         count += 1
                     elif piece[0] == oColor and ((c_off != 0) and (r_off != 0)) and (piece[1] == 'B' or piece[1] == 'Q'):
+                        print("Rem: ", (r, c), "{", move, "} ", piece[1])
                         self.remMoves(r, c, False, color)
                         count += 1
+                    elif piece[0] == oColor and ((abs(c_off) == 1) and (abs(r_off) == 1)) and (piece[1] == 'P'):
+                        print("Rem: ", (r, c), "{", move, "} ", piece[1])
+                        self.remMoves(r,c,False,color)
                     if piece[0] == oColor:
                         break
             ownColor = None
@@ -482,6 +491,7 @@ class GameState():
                         self.posMoves.pop(i)
 
         else:
+            print(self.kingPos)
             d_row = self.kingPos[0] - r
             d_col = self.kingPos[1] - c
             d_row = d_row/abs(d_row)
@@ -489,6 +499,7 @@ class GameState():
             places = [(r,c),(r+d_row,c+d_col)]
             l = 2
             while places[-1] != self.kingPos:
+                print("while")
                 places.append((r+d_row*l,c+d_col*l))
                 l+=1
             l+=1
@@ -520,7 +531,6 @@ class GameState():
                 b[piece[0][0]][piece[0][1]] = self.board[piece[0][0]][piece[0][1]]
                 b[self.kingPos[0]][self.kingPos[1]] = self.board[self.kingPos[0]][self.kingPos[1]]
                 self.white_turn = not self.white_turn
-
     def pinned(self, pinner, pinned, moveDir, piece):
         """
         This function checks if a piece is pinned to the king by a rook, bishop, or queen.
@@ -531,6 +541,7 @@ class GameState():
         m_c = moveDir[1]
         if m_r == 0 or m_c == 0:
             if m_c == 0 and (piece == 'R' or piece == 'Q'):
+                print("Pin: R or Q")
                 for i in range(len(self.posMoves)-1,-1,-1):
                     movePiece = self.posMoves[i][1]
                     if movePiece == pinned:
@@ -538,6 +549,7 @@ class GameState():
                         if movePiece[1] - movePlace[1] != 0:
                             self.posMoves.pop(i)
             elif m_r == 0 and (piece == 'B' or piece == 'Q'):
+                print("Pin: B or Q")
                 for i in range(len(self.posMoves)-1,-1,-1):
                     movePiece = self.posMoves[i][1]
                     if movePiece == pinned:
@@ -545,6 +557,7 @@ class GameState():
                         if movePiece[0] - movePlace[0] != 0:
                             self.posMoves.pop(i)
         elif piece == 'Q' or piece == 'B':
+            print("Pin: B or Q outside elif")
             for i in range(len(self.posMoves) - 1, -1, -1):
                 movePiece = self.posMoves[i][1]
                 if movePiece == pinned:
@@ -553,8 +566,6 @@ class GameState():
                     pieceDir = ((movePiece[0]-movePlace[0]) / abs(((movePiece[0]-movePlace[0]) if not movePiece[0]-movePlace[0] == 0 else 1)), (movePiece[1]-movePlace[1]) / abs(((movePiece[1]-movePlace[1]) if not movePiece[1]-movePlace[1] == 0 else 1)))
                     if pieceDir != moveDir:
                         self.posMoves.pop(i)
-
-
     def checkKnightcheck(self, oColor, kingPos):
         posKnightPlaces = []
         self.knightMoves(kingPos[0], kingPos[1], kingPos, self.board, posKnightPlaces)
