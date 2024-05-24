@@ -94,7 +94,7 @@ class GameState():
         moveR = Move(rook, rMloc, self.board)
         self.makeMove(moveK, moveR)
         self.white_turn = not self.white_turn
-    def is_empassant(self, move):
+    def is_en_passant(self, move):
         if len(self.mLog) > 1:
             lastMove = self.mLog[-1]
             print("heere")

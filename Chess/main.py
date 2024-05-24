@@ -47,7 +47,7 @@ def main(): # Driver code for the main chess game
                 if len(move) == 2:
                     if gs.board[move[0][0]][move[0][1]][1] == "P":
                         print("down")
-                        s = gs.is_empassant(move)
+                        s = gs.is_en_passant(move)
                     if gs.board[move[0][0]][move[0][1]][1] != "P" or not s:
                         if gs.board[move[0][0]][move[0][1]][1] == "K" and gs.board[move[1][0]][move[1][1]][1] == "R":
                             gs.castleMove(move[1], move[0])
@@ -73,7 +73,7 @@ def main(): # Driver code for the main chess game
                     #for the if condition the last condition makes sure that the we are not trying to drag it into the same place (it messes with the click move property)
                     if gs.board[move[0][0]][move[0][1]][1] == "P":
                         print("up")
-                        s = gs.is_empassant(move)
+                        s = gs.is_en_passant(move)
                     if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
                         gs.castleMove((my, mx), (mpy, mpx))
                         dragging = False
