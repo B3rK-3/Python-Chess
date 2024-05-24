@@ -45,24 +45,25 @@ def main(): # Driver code for the main chess game
                     move.append((mpy, mpx))
                     print(move)
                 if len(move) == 2:
-                    print(1)
-                    if gs.board[move[0][1]][move[0][0]][1] == "K" and gs.board[move[1][1]][move[1][0]][1] == "R":
-                        print("here")
-                        gs.castleMove(move[1], move[0])
-                        dragging = True
-                        vMoves = gs.genValidMoves(gs.board)
-                        move.clear()
-                    elif ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves: # making sure there were two clicks before
-                        moveC = ChessEngine.Move((move[0][0], move[0][1]), (move[1][0], move[1][1]), gs.board)
-                        gs.makeMove(moveC)
-                        vMoves = gs.genValidMoves(gs.board) #gen new valid moves
-                        dragging = True
-                        move.clear()
-                    elif gs.board[mpy][mpx] != '__':
-                        move = [(mpx, mpy)]
-                        print(move)
-                    else:
-                        move.clear()
+                    if gs.board[move[0][0]][move[0][1]][1] == "P":
+                        print("down")
+                        s = gs.is_empassant(move)
+                    if gs.board[move[0][0]][move[0][1]][1] != "P" or not s:
+                        if gs.board[move[0][0]][move[0][1]][1] == "K" and gs.board[move[1][0]][move[1][1]][1] == "R":
+                            gs.castleMove(move[1], move[0])
+                            dragging = True
+                            vMoves = gs.genValidMoves(gs.board)
+                            move.clear()
+                        elif ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves: # making sure there were two clicks before
+                            moveC = ChessEngine.Move((move[0][0], move[0][1]), (move[1][0], move[1][1]), gs.board)
+                            gs.makeMove(moveC, None)
+                            vMoves = gs.genValidMoves(gs.board) #gen new valid moves
+                            dragging = True
+                            move.clear()
+                        elif gs.board[mpy][mpx] != '__':
+                            move = [(mpx, mpy)]
+                            print(move)
+                    move.clear()
 
             elif e.type == p.MOUSEBUTTONUP:
                 mx, my = p.mouse.get_pos()
@@ -70,20 +71,20 @@ def main(): # Driver code for the main chess game
                 mx = mx//SQ_EACH_SIZE
                 if mpx < SIZE and mpy < SIZE and mx < HEIGHT and my < WIDTH and gs.board[mpy][mpx] != "__" and (mx,my) != (mpx, mpy): #make sure that the dragged is not empty and within bounds
                     #for the if condition the last condition makes sure that the we are not trying to drag it into the same place (it messes with the click move property)
-                    print(2)
+                    if gs.board[move[0][0]][move[0][1]][1] == "P":
+                        print("up")
+                        s = gs.is_empassant(move)
                     if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
-                        print("here")
                         gs.castleMove((my, mx), (mpy, mpx))
-                        dragging = True
+                        dragging = False
                         vMoves = gs.genValidMoves(gs.board)
-                        move.clear()
                     elif ((my,mx),(mpy,mpx)) in vMoves:
                         moveC = ChessEngine.Move((mpy, mpx), (my, mx), gs.board)
-                        gs.makeMove(moveC)
+                        gs.makeMove(moveC, None)
                         vMoves = gs.genValidMoves(gs.board) #gen new valid moves
                         mpx, mpy = 1000, 1000
                         dragging = False
-                        move.clear()
+                    move.clear()
 
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_LEFT:

@@ -24,19 +24,36 @@ class GameState():
         self.whiteHasCastled = False
         self.blackHasCastled = False
 
-    def makeMove(self, move):
-        self.board[move.startRow][move.startCol] = "__"
-        self.board[move.endRow][move.endCol] = move.pieceMoved
-        self.mLog.append(move)
-        self.white_turn = not self.white_turn
+    def makeMove(self, move, move1):
+        if not move1:
+            self.board[move.startRow][move.startCol] = "__"
+            self.board[move.endRow][move.endCol] = move.pieceMoved
+            self.mLog.append(move)
+            self.white_turn = not self.white_turn
+        else:
+            self.board[move.startRow][move.startCol] = "__"
+            self.board[move.endRow][move.endCol] = move.pieceMoved
+            self.board[move1.startRow][move1.startCol] = "__"
+            self.board[move1.endRow][move1.endCol] = move1.pieceMoved
+            self.mLog.append((move, move1))
 
     def undoMove(self):
         if len(self.mLog) > 0:
             m = self.mLog.pop()
-            self.board[m.startRow][m.startCol] = m.pieceMoved
-            self.board[m.endRow][m.endCol] = m.pieceCaptured
-            self.white_turn = not self.white_turn
-
+            if not isinstance(m, tuple):
+                self.board[m.startRow][m.startCol] = m.pieceMoved
+                self.board[m.endRow][m.endCol] = m.pieceCaptured
+                self.white_turn = not self.white_turn
+            else:
+                self.board[m[0].startRow][m[0].startCol] = m[0].pieceMoved
+                self.board[m[0].endRow][m[0].endCol] = m[0].pieceCaptured
+                self.board[m[1].startRow][m[1].startCol] = m[1].pieceMoved
+                self.board[m[1].endRow][m[1].endCol] = m[1].pieceCaptured
+                self.white_turn = not self.white_turn
+                if not self.white_turn:
+                    self.whiteHasCastled = False
+                else:
+                    self.whiteHasCastled = False
     def canCastle(self,rook,king):
         if not self.white_turn and self.blackHasCastled:
             return False
@@ -45,17 +62,16 @@ class GameState():
         logs = [(x.startRow, x.startCol) for x in self.mLog]
         self.white_turn = not self.white_turn
         oppM = [x[0] for x in self.genValidMoves(self.board)]
-        print("oppM", oppM)
         self.white_turn = not self.white_turn
         if rook not in logs and king not in logs:
             left = (True if rook[1] - king[1] < 0 else False)
             if not left:
                 for i in range(king[1] + 1, rook[1]):
-                    if self.board[king[0]][i] != "__" or self.board[king[0]][i] in oppM:
+                    if self.board[king[0]][i] != "__" or (king[0], i) in oppM:
                         return False
             else:
                 for i in range(rook[1] + 1, king[1]):
-                    if self.board[king[0]][i] != "__" or self.board[king[0]][i] in oppM:
+                    if self.board[king[0]][i] != "__" or (king[0], i) in oppM:
                         return False
         return True
     def castleMove(self, rook, king):
@@ -74,13 +90,17 @@ class GameState():
         else:
             kMloc = (king[0], 6)  # math.ceil to account for the right side castling
             rMloc = (kMloc[0], 5)
-        print()
-        self.board[kMloc[0]][kMloc[1]] = self.board[king[0]][king[1]] #move king to the location
-        self.board[rMloc[0]][rMloc[1]] = self.board[rook[0]][rook[1]]
-        self.board[rook[0]][rook[1]] = "__"
-        self.board[king[0]][king[1]] = "__"
-        self.mLog.append(moveC)
+        moveK = Move(king, kMloc, self.board)
+        moveR = Move(rook, rMloc, self.board)
+        self.makeMove(moveK, moveR)
         self.white_turn = not self.white_turn
+    def is_empassant(self, move):
+        if len(self.mLog) > 1:
+            lastMove = self.mLog[-1]
+            print("heere")
+            if not isinstance(lastMove, tuple) and lastMove.pieceMoved[1] == "P" and abs(lastMove.endRow - lastMove.startRow) == 2:
+                print(1)
+        else: return False
     def genValidMoves(self, board):
         """"""
         """
@@ -429,15 +449,12 @@ class GameState():
                             break
                         ownColor = (r,c)
                     elif piece[0] == oColor and ownColor:
-                        print("entering pinned")
                         self.pinned((r, c), ownColor, move, piece[1])
                         break
                     if piece[0] == oColor and ((c_off == 0) or (r_off == 0)) and (piece[1] == 'R' or piece[1] == 'Q'):
-                        print(r,c, "vh")
                         self.remMoves(r,c, True, color)
                         count += 1
                     elif piece[0] == oColor and ((c_off != 0) and (r_off != 0)) and (piece[1] == 'B' or piece[1] == 'Q'):
-                        print(r,c, "check around")
                         self.remMoves(r, c, False, color)
                         count += 1
                     if piece[0] == oColor:
@@ -452,20 +469,16 @@ class GameState():
                 for i in range(len(self.posMoves)-1, -1, -1):
                     m = self.posMoves[i]
                     if m[1] == self.kingPos and ((d_col > 0 and (m[0][0] == r and self.kingPos[1] > m[0][1] > c)) or (d_col < 0 and (m[0][0] == r and self.kingPos[1] < m[0][1] < c))):
-                        print(m, d_row, "d_row check, peice move deleted")
                         self.posMoves.pop(i)
                     elif m[1] != self.kingPos and ((d_col > 0 and not (m[0][0] == r and self.kingPos[1] > m[0][1] >= c)) or (d_col < 0 and not (m[0][0] == r and self.kingPos[1] < m[0][1] <= c))):
-                        print(m, d_row, "d_row check, peice move deleted")
                         self.posMoves.pop(i)
             if d_col == 0:
                 print(self.posMoves)
                 for i in range(len(self.posMoves)-1, -1, -1):
                     m = self.posMoves[i]
                     if m[1] == self.kingPos and ((d_row > 0 and (m[0][1] == c and self.kingPos[0] > m[0][0] > r)) or (d_row < 0 and (m[0][1] == c and m[0][0] != r))):
-                        print(m, d_row, "d_col check, king move deleted")
                         self.posMoves.pop(i)
                     elif m[1] != self.kingPos and ((d_row > 0 and not (m[0][1] == c and self.kingPos[0] > m[0][0] >= r)) or (d_row < 0 and not (m[0][1] == c and self.kingPos[0] < m[0][0] <= r))):
-                        print(m, d_row, "d_col check, peice move deleted", (r,c))
                         self.posMoves.pop(i)
 
         else:
@@ -480,17 +493,12 @@ class GameState():
                 l+=1
             l+=1
             for i in range(len(self.posMoves) - 1, -1, -1):
-                print(self.posMoves[i], "remMoves diagonal", places)
                 if self.posMoves[i][1] == self.kingPos:
-                    print(1, self.posMoves[i])
                     if self.posMoves[i][0][0] == r and (self.posMoves[i][0][1] == c):
-                        print(2, self.posMoves[i])
                         continue
                     elif (self.posMoves[i][0] in places or self.posMoves[i][0] == (r+d_row*l,c+d_col*l)):
-                        print(3, self.posMoves[i])
                         self.posMoves.pop(i)
                 elif self.posMoves[i][0] not in places:
-                    print(4, self.posMoves[i])
                     self.posMoves.pop(i)
             """if not ((self.kingPos[0] <= toM[0][0] < r and self.kingPos[1] >= toM[0][1] > c) or (self.kingPos[0] >= toM[0][0] > r and self.kingPos[1] >= toM[0][1] > c) or (self.kingPos[0] >= toM[0][0] > r and self.kingPos[1] <= toM[0][1] < c) or (self.kingPos[0] <= toM[0][0] < r and self.kingPos[1] <= toM[0][1] < c)) and self.board[toM[1][0]][toM[1][1]][1] != 'K': # if it is not between the king and queen diagonally or orthogonally
                 print(3,'\t', r, c)
@@ -505,7 +513,6 @@ class GameState():
             if piece[1] == self.kingPos:
                 b[piece[0][0]][piece[0][1]] = b[self.kingPos[0]][self.kingPos[1]]
                 b[self.kingPos[0]][self.kingPos[1]] = "__"
-                print(b)
                 self.white_turn = not self.white_turn
                 moves = self.genPossibleMoves(b)
                 if (piece[0][0], piece[0][1]) in [x[0] for x in moves]:
@@ -536,7 +543,6 @@ class GameState():
                     if movePiece == pinned:
                         movePlace = self.posMoves[i][0]
                         if movePiece[0] - movePlace[0] != 0:
-                            print(2)
                             self.posMoves.pop(i)
         elif piece == 'Q' or piece == 'B':
             for i in range(len(self.posMoves) - 1, -1, -1):
@@ -545,9 +551,7 @@ class GameState():
                     #if self.board[pinned[0]][pinned[1]][1] == "P" and :
                     movePlace = self.posMoves[i][0]
                     pieceDir = ((movePiece[0]-movePlace[0]) / abs(((movePiece[0]-movePlace[0]) if not movePiece[0]-movePlace[0] == 0 else 1)), (movePiece[1]-movePlace[1]) / abs(((movePiece[1]-movePlace[1]) if not movePiece[1]-movePlace[1] == 0 else 1)))
-                    print(pieceDir, moveDir)
                     if pieceDir != moveDir:
-                        print(2)
                         self.posMoves.pop(i)
 
 
@@ -555,14 +559,12 @@ class GameState():
         posKnightPlaces = []
         self.knightMoves(kingPos[0], kingPos[1], kingPos, self.board, posKnightPlaces)
         posKnightPlaces = [x[0] for x in posKnightPlaces]
-        print(posKnightPlaces)
         KnIsPresent = None
         for r,c in posKnightPlaces:
             if self.board[r][c] == oColor+'N':
                 KnIsPresent = (r,c)
                 break
         if KnIsPresent:
-            print(1)
             for i in range(len(self.posMoves)-1, -1, -1):
                 p = self.posMoves[i]
                 if p[0] != KnIsPresent and self.board[p[1][0]][p[1][1]][1] != 'K': #if the piece being checked is not king and it does not eat the Knight, pop it
