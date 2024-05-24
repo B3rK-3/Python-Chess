@@ -2,6 +2,8 @@
 Main.py file is responsible for running the game engine. Will handle user input and GUI.
 """
 import pygame as p
+import pygame.font
+
 from Python_Chess_Engine.Chess import ChessEngine
 
 WIDTH = HEIGHT = 600
@@ -105,7 +107,8 @@ def draw_game_state(screen, gs):
     :return:
     """
     draw_board(screen) # helper function to draw the board
-    draw_pieces(screen, gs.board) # helper function to draw the pices
+    draw_pieces(screen, gs.board) # helper function to draw the pieces
+    draw_places(screen)
 
 def draw_board(screen):
     """
@@ -117,9 +120,9 @@ def draw_board(screen):
     for r in range(SIZE):
         for c in range(SIZE):
             if white:
-                p.draw.rect(screen, p.Color(227,193,111), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+                p.draw.rect(screen, p.Color(227, 193, 111), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
             else:
-                p.draw.rect(screen, p.Color(184,139,74), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+                p.draw.rect(screen, p.Color(184, 139, 74), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
             white = not white
         white = not white
 def draw_pieces(screen, board):
@@ -134,7 +137,20 @@ def draw_pieces(screen, board):
             pc = board[r][c]
             if pc != "__": #not empty
                 screen.blit(IMAGES[pc], p.Rect(c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
-
+def draw_places(screen):
+    letters = 'abcdefgh'
+    font = pygame.font.SysFont("Arial", 15)
+    colors = ((255, 204, 117), (153, 102, 51))
+    white = 0
+    for i in range(1,len(letters)+1):
+        f = font.render(letters[i-1], True, colors[white])
+        screen.blit(f, (64 * i+i*11-10+(3 if letters[i-1] == 'f' else 0), HEIGHT-15-(3 if letters[i-1] == 'g' or letters[i-1] == 'h' else 0)))
+        f = font.render(str(i), True, colors[(white if not white else 1)])
+        screen.blit(f, (1, 75 * (9-i)-75))
+        if not white:
+            white+=1
+        else:
+            white-=1
 
 if __name__ == '__main__':
     main()
