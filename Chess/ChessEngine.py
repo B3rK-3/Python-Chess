@@ -93,7 +93,7 @@ class GameState():
         moveR = Move(rook, rMloc, self.board)
         self.makeMove(moveK, moveR)
         self.white_turn = not self.white_turn
-    def is_en_passant(self, move):
+    def make_if_en_passant(self, move):
         if len(self.mLog) > 1:
             lastMove = self.mLog[-1]
             print("heere")
@@ -101,7 +101,8 @@ class GameState():
                 passer = Move(move[0], move[1], self.board)
                 passed = Move((lastMove.endRow,lastMove.endCol), (lastMove.endRow+(-1 if self.white_turn else 1),lastMove.endCol), self.board)
                 self.makeMove(passer, passed)
-        else: return False
+                self.white_turn = not self.white_turn
+                return True
     def genValidMoves(self, board):
         """"""
         """
@@ -143,7 +144,7 @@ class GameState():
                 b = board[row][col]
                 if b[0] == colors[turn]:
                     if b[1] == 'P':
-                        self.pawnMoves(row, col, b, board, possibleMoves)
+                        self.pawnMoves(row, col, b, board, possibleMoves, colors[(1 if self.white_turn else 0)])
                     elif b[1] == 'N':
                         self.knightMoves(row, col, b, board, possibleMoves)
                     elif b[1] == 'R':
@@ -155,10 +156,23 @@ class GameState():
                     elif b[1] == 'K':
                         self.kingMoves(row, col, b, board, possibleMoves)
         return possibleMoves
-    def pawnMoves(self, row, col, b, board, possibleMoves):
+    def pawnMoves(self, row, col, b, board, possibleMoves, oColor):
         """
         Check all the possible moves for a pawn.
         """
+        if len(self.mLog) > 1:
+            lastMove = self.mLog[-1]
+            if not isinstance(lastMove, tuple) and lastMove.pieceMoved[1] == "P" and abs(lastMove.endRow - lastMove.startRow) == 2 and row == lastMove.endRow:
+                if col + 1 == lastMove.endCol:
+                    if oColor == 'b':
+                        possibleMoves.append(((row -1, col+1), (row, col)))
+                    else:
+                        possibleMoves.append(((row +1, col+1), (row, col)))
+                if col - 1 == lastMove.endCol:
+                    if oColor == 'b':
+                        possibleMoves.append(((row -1, col-1), (row, col)))
+                    else:
+                        possibleMoves.append(((row +1, col-1), (row, col)))
         if b[0] == 'w':
             if row == 6 and board[row-1][col] == "__" and board[row-2][col] == "__":  # To check if the pawn has never been moved therefore it can move 2
                 possibleMoves.append(((row - 2, col), (row, col)))

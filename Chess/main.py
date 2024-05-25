@@ -29,88 +29,87 @@ def main(): # Driver code for the main chess game
     FPS = MAX_FPS
     gs = ChessEngine.GameState()
     running = True
-    dragging = False
     move = [] # two tuples [(7,7), (6,3)] will store where the user wants to move the piece to
     mpx = 0
     mpy = 0
     vMoves = gs.genValidMoves(gs.board)
+    highlight = []
+    en_passant = False
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
-
-            elif e.type == p.MOUSEBUTTONDOWN:
+            elif e.type == p.MOUSEBUTTONUP and e.button == 3:
+                hx, hy = p.mouse.get_pos()
+                hy = hy//SQ_EACH_SIZE
+                hx = hx//SQ_EACH_SIZE
+                if (hy,hx) not in highlight:
+                    highlight.append((hy,hx))
+                else:
+                    highlight.remove((hy,hx))
+            elif e.type == p.MOUSEBUTTONDOWN and e.button == 1:
                 mx, my = p.mouse.get_pos()
+                if len(move) == 2 and ((move[1][0], move[1][1]), (move[0][0], move[0][1])) not in vMoves:
+                    move.clear()
                 if mx < HEIGHT and my < WIDTH:
                     mpx = mx//SQ_EACH_SIZE
                     mpy = my//SQ_EACH_SIZE
                     move.append((mpy, mpx))
-                    print(move)
-                if len(move) == 2:
-                    if gs.board[move[0][0]][move[0][1]][1] == "P":
-                        print("down")
-                        s = gs.is_en_passant(move)
-                    if gs.board[move[0][0]][move[0][1]][1] != "P" or not s:
-                        if gs.board[move[0][0]][move[0][1]][1] == "K" and gs.board[move[1][0]][move[1][1]][1] == "R":
-                            gs.castleMove(move[1], move[0])
-                            dragging = True
-                            vMoves = gs.genValidMoves(gs.board)
-                            move.clear()
-                        elif ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves: # making sure there were two clicks before
-                            moveC = ChessEngine.Move((move[0][0], move[0][1]), (move[1][0], move[1][1]), gs.board)
-                            gs.makeMove(moveC, None)
-                            vMoves = gs.genValidMoves(gs.board) #gen new valid moves
-                            dragging = True
-                            move.clear()
-                        elif gs.board[mpy][mpx] != '__':
-                            move = [(mpx, mpy)]
-                            print(move)
-                    move.clear()
+                    print(move, "DOWN")
+                    if len(move) == 2 and ((move[1][0], move[1][1]),(move[0][0], move[0][1])) not in vMoves:
+                        move = [move[1]]
 
-            elif e.type == p.MOUSEBUTTONUP:
+
+            elif e.type == p.MOUSEBUTTONUP and e.button == 1:
                 mx, my = p.mouse.get_pos()
                 my = my//SQ_EACH_SIZE
                 mx = mx//SQ_EACH_SIZE
-                if mpx < SIZE and mpy < SIZE and mx < HEIGHT and my < WIDTH and gs.board[mpy][mpx] != "__" and (mx,my) != (mpx, mpy): #make sure that the dragged is not empty and within bounds
+                if not (my,mx) in move:
+                    move.append((my,mx))
+                print(move, "UP")
+                if len(move) == 2 and gs.board[move[0][0]][move[0][1]] != "__": #make sure that the dragged is not empty and within bounds
                     #for the if condition the last condition makes sure that the we are not trying to drag it into the same place (it messes with the click move property)
-                    if gs.board[mpy][mpx][1] == "P":
-                        print("up")
-                        s = gs.is_en_passant(((mpy, mpx), (my, mx)))
-                    if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
-                        gs.castleMove((my, mx), (mpy, mpx))
-                        dragging = False
-                        vMoves = gs.genValidMoves(gs.board)
-                    elif ((my,mx),(mpy,mpx)) in vMoves:
-                        moveC = ChessEngine.Move((mpy, mpx), (my, mx), gs.board)
-                        gs.makeMove(moveC, None)
-                        vMoves = gs.genValidMoves(gs.board) #gen new valid moves
-                        mpx, mpy = 1000, 1000
-                        dragging = False
-                    move.clear()
-
+                    print(1)
+                    if ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves and gs.make_if_en_passant(((move[0][0], move[0][1]), (move[1][0], move[1][1]))):
+                        pass
+                    else:
+                        if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
+                            gs.castleMove((my, mx), (mpy, mpx))
+                            vMoves = gs.genValidMoves(gs.board)
+                        elif ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves:
+                            moveC = ChessEngine.Move(move[0], move[1], gs.board)
+                            gs.makeMove(moveC, None)
+                            highlight = []
+                            vMoves = gs.genValidMoves(gs.board) #gen new valid moves
+                            mpx, mpy = 1000, 1000
+                        else:
+                            move = [move[1]]
+                elif len(move) == 2:
+                    move = [move[1]]
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_LEFT:
                     gs.undoMove()
                     vMoves = gs.genValidMoves(gs.board)  # gen new valid moves
+                    move.clear()
 
             p.display.flip()
-        draw_game_state(screen, gs)
+        draw_game_state(screen, gs, move, highlight)
         clock.tick(MAX_FPS)
         p.display.flip()
 
 
-def draw_game_state(screen, gs):
+def draw_game_state(screen, gs, draw, highlight):
     """
     Responsible for graphics game state
     :param screen:
     :param gs:
     :return:
     """
-    draw_board(screen) # helper function to draw the board
+    draw_board(screen, draw, highlight) # helper function to draw the board
     draw_pieces(screen, gs.board) # helper function to draw the pieces
     draw_places(screen)
 
-def draw_board(screen):
+def draw_board(screen, draw, highlight):
     """
     draw the board
     :param screen:
@@ -119,10 +118,16 @@ def draw_board(screen):
     white = True
     for r in range(SIZE):
         for c in range(SIZE):
-            if white:
-                p.draw.rect(screen, p.Color(227, 193, 111), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+            if (r,c) in highlight:
+                p.draw.rect(screen, p.Color(255, 204, 0),(c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
             else:
-                p.draw.rect(screen, p.Color(184, 139, 74), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+                if (r,c) in draw:
+                    p.draw.rect(screen, p.Color(255, 255, 102),(c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+                else:
+                    if white:
+                        p.draw.rect(screen, p.Color(227, 193, 111), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+                    else:
+                        p.draw.rect(screen, p.Color(184, 139, 74), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
             white = not white
         white = not white
 def draw_pieces(screen, board):
