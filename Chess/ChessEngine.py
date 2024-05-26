@@ -97,7 +97,6 @@ class GameState():
     def make_if_en_passant(self, move):
         if len(self.mLog) > 1:
             lastMove = self.mLog[-1]
-            print("heere")
             if not isinstance(lastMove, tuple) and lastMove.pieceMoved[1] == "P" and abs(lastMove.endRow - lastMove.startRow) == 2 and move[1][1] == lastMove.endCol and move[0][0] == lastMove.endRow and ((self.white_turn and move[1][0]-lastMove.endRow == -1) or (not self.white_turn and move[1][0]-lastMove.endRow == 1)):
                 passer = Move(move[0], move[1], self.board)
                 passed = Move((lastMove.endRow,lastMove.endCol), (lastMove.endRow+(-1 if self.white_turn else 1),lastMove.endCol), self.board)
