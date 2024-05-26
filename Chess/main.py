@@ -39,6 +39,7 @@ def main(): # Driver code for the main chess game
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
+                exit("QUIT")
             elif e.type == p.MOUSEBUTTONUP and e.button == 3:
                 hx, hy = p.mouse.get_pos()
                 hy = hy//SQ_EACH_SIZE
@@ -69,21 +70,28 @@ def main(): # Driver code for the main chess game
                 print(move, "UP")
                 if len(move) == 2 and gs.board[move[0][0]][move[0][1]] != "__": #make sure that the dragged is not empty and within bounds
                     #for the if condition the last condition makes sure that the we are not trying to drag it into the same place (it messes with the click move property)
-                    print(1)
-                    if ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves and gs.make_if_en_passant(((move[0][0], move[0][1]), (move[1][0], move[1][1]))):
-                        pass
+                    if ((move[1][0], move[1][1]), (move[0][0], move[0][1])) in vMoves and gs.board[move[0][0]][move[0][1]][1] == "P" and ((move[1][0] == 0) or (move[1][0] == 7)):
+                        moveC = ChessEngine.Move(move[0], move[1], gs.board)
+                        gs.makeMove(moveC, None)
+                        draw_game_state(screen, gs, move, highlight)
+                        p.display.flip()
+                        gs.pawnPromotion(((move[1][0], move[1][1]), (move[0][0], move[0][1])), screen)
+                        vMoves = gs.genValidMoves(gs.board)  # gen new valid moves
                     else:
-                        if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
-                            gs.castleMove((my, mx), (mpy, mpx))
-                            vMoves = gs.genValidMoves(gs.board)
-                        elif ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves:
-                            moveC = ChessEngine.Move(move[0], move[1], gs.board)
-                            gs.makeMove(moveC, None)
-                            highlight = []
-                            vMoves = gs.genValidMoves(gs.board) #gen new valid moves
-                            mpx, mpy = 1000, 1000
+                        if ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves and gs.make_if_en_passant(((move[0][0], move[0][1]), (move[1][0], move[1][1]))):
+                            pass
                         else:
-                            move = [move[1]]
+                            if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
+                                gs.castleMove((my, mx), (mpy, mpx))
+                                vMoves = gs.genValidMoves(gs.board)
+                            elif ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves:
+                                moveC = ChessEngine.Move(move[0], move[1], gs.board)
+                                gs.makeMove(moveC, None)
+                                highlight = []
+                                vMoves = gs.genValidMoves(gs.board) #gen new valid moves
+                                mpx, mpy = 1000, 1000
+                            else:
+                                move = [move[1]]
                 elif len(move) == 2:
                     move = [move[1]]
             elif e.type == p.KEYDOWN:

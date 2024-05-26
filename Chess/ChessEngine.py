@@ -3,6 +3,7 @@ The engine is responsible for storing information about the chess board and game
 deciding whether the play is valid.
 """
 import math
+import pygame as p
 
 class GameState():
     def __init__(self):
@@ -191,6 +192,52 @@ class GameState():
                 possibleMoves.append(((row + 1, col - 1), (row, col)))
             if col + 1 < 8 and board[row + 1][col + 1][0] == 'w':
                 possibleMoves.append(((row + 1, col + 1), (row, col)))
+    def pawnPromotion(self, move, screen):
+        running = True
+        p_names = ['wR', 'wB', 'wN', 'wQ', 'bR', 'bB', 'bN', 'bQ']
+        IMAGES = {}
+        color = ''
+        font = p.font.SysFont("Arial", 15)
+        for e in p_names:
+            IMAGES[e] = p.transform.scale(p.image.load('img/' + e + '.png'), (75, 75))
+        if not self.white_turn:
+            color = 'w'
+            shift = (75*(move[0][1]-4) if move[0][1] > 4 else 0)
+            rect = p.draw.rect(screen, (255, 204, 117), (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 4 * 75, 90),
+                               border_radius=5)
+            rect = p.draw.rect(screen, (0, 0, 0), (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 300, 90), 2, 5)
+            for i in range(4):
+                screen.blit(IMAGES[p_names[i]], p.Rect(i * 75 + move[0][1]*75-5-shift,(move[0][0])*75+100, 75, 75))
+                f = font.render(str(i+1), True, (0,0,0))
+                screen.blit(f, p.Rect(i * 75 + move[0][1] * 75+30-shift, (move[0][0]) * 75 + 170, 75, 75))
+        else:
+            color = 'b'
+            shift = (75*(move[0][1]-4) if move[0][1] > 4 else 0)
+            rect = p.draw.rect(screen, (255, 204, 117), (move[0][1] * 75-shift, (move[0][0]) * 75 - 100, 4 * 75, 90),border_radius=5)
+            rect = p.draw.rect(screen, (0, 0, 0), (move[0][1] * 75 - shift, (move[0][0]) * 75 - 100, 300, 90), 2, 5)
+            for i in range(4,len(p_names)):
+                screen.blit(IMAGES[p_names[i]],p.Rect(i * 75 + move[0][1] * 75 - 303-shift, (move[0][0]) * 75 - 100, 75, 75))
+                f = font.render(str(i -3), True, (0, 0, 0))
+                screen.blit(f, p.Rect(i * 75 + move[0][1] * 75 - 268.5-shift, (move[0][0]) * 75-28, 75, 75))
+        p.display.flip()
+        while running:
+            for e in p.event.get():
+                if e.type == p.QUIT:
+                    running = False
+                    exit("QUIT")
+                if e.type == p.KEYDOWN or e.type == p.KEYUP:
+                    if e.key == p.K_1:
+                        self.board[move[0][0]][move[0][1]] = color+'R'
+                        running = False
+                    elif e.key == p.K_2:
+                        self.board[move[0][0]][move[0][1]] = color+'B'
+                        running = False
+                    elif e.key == p.K_3:
+                        self.board[move[0][0]][move[0][1]] = color+'N'
+                        running = False
+                    elif e.key == p.K_4:
+                        self.board[move[0][0]][move[0][1]] = color+'Q'
+                        running = False
     def knightMoves(self, row, col, b, board, possibleMoves):
         """
         Check all the possible moves for a knight ps. there is max 8
