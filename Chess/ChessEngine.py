@@ -8,7 +8,7 @@ class GameState:
         # The notation is as follows: 'bR' = black rook, 'wR' = white rook, '__' = empty square, etc.
         self.board = [
             ["bR", "__", "__", "__", "bK", "__", "__", "bR"],
-            ["bP", "bP", "wP", "__", "bP", "bP", "bP", "bP"],
+            ["bP", "bP", "wP", "__", "bP", "bP", "wP", "bP"],
             ["__", "__", "__", "__", "bP", "__", "__", "__"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
@@ -65,9 +65,15 @@ class GameState:
             self.white_turn = not self.white_turn  # Switch turns back.
 
     def canCastle(self, kingPos, rookPos):
+        print("inside canCastle")
         # Generate possible castling moves.
-        logs = logs = [(each[0].startRow, each[0].startCol, each[1].startRow, each[1].startCol) if isinstance(each, tuple) else (each.startRow, each.startCol) for each in self.mLog] #Accounting for the possibility that a move like en passant has been made which is a tuple in the self.mLog list
-        
+        logs = []  # Accounting for the possibility that a move like en passant has been made which is a tuple in the self.mLog list
+        for each in self.mLog:
+            if isinstance(each, tuple):
+                logs.append((each[0].startRow, each[0].startCol))
+                logs.append((each[1].startRow, each[1].startCol))
+            else:
+                logs.append((each.startRow, each.startCol))
         if self.white_turn:
             # Set positions for white king and rooks.
             king = (7, 4)
@@ -79,15 +85,17 @@ class GameState:
 
         # Check move logs to see rooks or king was moved
         if kingPos != king or rookPos not in rooks:
+            print(1)
             return False
         for log in logs:
             if king == log:
+                print(2)
                 return False
             elif log in rooks:
                 rooks.remove(log)
         if not rooks:
+            print(3)
             return False
-        print(1)
         # Generate opponent's moves.
         self.white_turn = not self.white_turn
         oppM = [x[0] for x in self.genValidMoves(self.board)]
@@ -97,6 +105,7 @@ class GameState:
         row = kingPos[0]
         for r, _ in oppM:
             if r == row:
+                print(4)
                 return False
         print("can castle")
         return True
@@ -243,7 +252,7 @@ class GameState:
         font = p.font.SysFont("Arial", 15)
         for e in p_names:
             IMAGES[e] = p.transform.scale(p.image.load("img/" + e + ".png"), (75, 75))
-        if not self.white_turn:
+        if self.white_turn:
             # If it's black's turn, set up the promotion options for white.
             color = "w"
             shift = 75 * (move[0][1] - 4) if move[0][1] > 4 else 0
@@ -323,20 +332,21 @@ class GameState:
                 if e.type == p.QUIT:
                     running = False
                     exit("QUIT")
-                if e.type == p.KEYDOWN or e.type == p.KEYUP:
+                elif e.type == p.KEYDOWN or e.type == p.KEYUP:
                     if e.key == p.K_1:
-                        self.board[move[0][0]][move[0][1]] = color + "R"
+                        return color + "R"
                         running = False
                     elif e.key == p.K_2:
-                        self.board[move[0][0]][move[0][1]] = color + "B"
+                        return color + "B"
                         running = False
                     elif e.key == p.K_3:
-                        self.board[move[0][0]][move[0][1]] = color + "N"
+                        return color + "N"
                         running = False
                     elif e.key == p.K_4:
-                        self.board[move[0][0]][move[0][1]] = color + "Q"
+                        return color + "Q"
                         running = False
-        return self.board[move[0][0]][move[0][1]]
+        return None
+
     def knightMoves(self, row, col, piece, board, possibleMoves):
         """
         Generate all possible knight moves from the given position.
@@ -500,6 +510,9 @@ class GameState:
         if count > 0:
             self.check = True
         return count > 0
+    
+    def movePiece(self, r, c, piece):
+        self.board[r][c] = piece
 
     def remMoves(self, r, c, vh, color):
         # Remove illegal moves due to checks.
@@ -673,7 +686,7 @@ class Move:
     filesToCols = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
     colsToFiles = {v: k for k, v in filesToCols.items()}
 
-    def __init__(self, startSq, endSq, board):
+    def __init__(self, startSq, endSq, board, typeOfMove = None):
         # Initialize a move with starting and ending squares.
         self.startRow = startSq[0]
         self.startCol = startSq[1]
@@ -681,6 +694,7 @@ class Move:
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
+        self.type = typeOfMove
 
     def getChessNotation(self):
         # Return the move in standard chess notation.

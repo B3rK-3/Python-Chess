@@ -18,26 +18,22 @@ IMAGES = {}  # A dictionary to store images of the chess pieces.
 GameState = (
     ChessEngine.GameState()
 )  # Create a GameState object to keep track of the game state.
-SCREEN = None
 CLOCK = None
-RUNNING = True  # A flag to control the main loop.
-ValidMoves = None
-
+validMoves = None
 
 def main():
     """
     The main driver for the chess game. This function handles user input and updates the graphics.
     """
-    global RUNNING
-    setPyGameValues()
+    screen = setPyGameValues()
     loadImages()  # Load images once to save memory.
     generateValidMoves()
     userClicks = []  # A list to store the user clicks
     toHighlight = []  # A list to keep track of squares to highlight.
-    drawGameState(SCREEN, GameState, userClicks, toHighlight)
+    drawGameState(screen, GameState, userClicks, toHighlight)
     p.display.flip()
-    while RUNNING:
-        eventHandler(toHighlight, userClicks)
+    while True:
+        eventHandler(toHighlight, userClicks, screen)
 
 
 def drawGameState(screen, gs, draw, highlight):
@@ -164,17 +160,15 @@ def draw_places(screen):
 
 
 def setPyGameValues():
-    global SCREEN
     global CLOCK
     p.init()  # Initialize all imported pygame modules.
-    SCREEN = p.display.set_mode((WIDTH, HEIGHT))  # Set up the game window.
     p.display.set_caption("CHESS IN PYTHON")  # Set the window title.
     CLOCK = p.time.Clock()  # Create a clock object to manage updates.
-
+    return p.display.set_mode((WIDTH, HEIGHT))  # Set up the game window.
 
 def generateValidMoves():
-    global ValidMoves
-    ValidMoves = GameState.genValidMoves(
+    global validMoves
+    validMoves = GameState.genValidMoves(
         GameState.board
     )  # Generate all valid moves for the current board state.
 
@@ -205,7 +199,7 @@ def loadImages():
         )
 
 
-def eventHandler(toHighlight, userClicks):
+def eventHandler(toHighlight, userClicks, screen):
     for event in p.event.get():
         if event.type == p.QUIT:
             p.quit()
@@ -216,17 +210,17 @@ def eventHandler(toHighlight, userClicks):
             squareHighlight(squareX, squareY, toHighlight)
             generateValidMoves()  # Generate new valid moves.
             toHighlight.clear()
-            drawGameState(SCREEN, GameState, userClicks, toHighlight)
+            drawGameState(screen, GameState, userClicks, toHighlight)
         elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
-            handleButtonDown(*p.mouse.get_pos(), userClicks, toHighlight)
+            handleSquareSelection(*p.mouse.get_pos(), userClicks, toHighlight, screen)
             generateValidMoves()  # Generate new valid moves.
             toHighlight.clear()
-            drawGameState(SCREEN, GameState, userClicks, toHighlight)
+            drawGameState(screen, GameState, userClicks, toHighlight)
         elif event.type == p.KEYDOWN and event.key == p.K_LEFT:
             handleLeftButtonDown(userClicks)
             generateValidMoves()  # Generate new valid moves.
             toHighlight.clear()
-            drawGameState(SCREEN, GameState, userClicks, toHighlight)
+            drawGameState(screen, GameState, userClicks, toHighlight)
         CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
         p.display.flip()  # Update the display.
 
@@ -253,7 +247,7 @@ def squareHighlight(x, y, toHighlight):
         )  # Remove the square from the highlight list if it's already highlighted.
 
 
-def handleButtonDown(mouseX, mouseY, userClicks, toHighlight):
+def handleSquareSelection(mouseX, mouseY, userClicks, toHighlight, screen):
     # Check its within bounds
     # Not elif because we still want to update after clearing the userClicks
     if mouseX < WIDTH and mouseY < HEIGHT:
@@ -261,53 +255,67 @@ def handleButtonDown(mouseX, mouseY, userClicks, toHighlight):
         squareX, squareY = findSquare(mouseX, mouseY)
         if len(userClicks) == 1:
             userClicks.append((squareY, squareX))
-            print(userClicks)
-            if (userClicks[1], userClicks[0]) in ValidMoves:
+            print(userClicks, "Mouse Down")
+            # Check for castling move.
+            if (
+                GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "K"
+                and GameState.board[userClicks[1][0]][userClicks[1][1]][1] == "R"
+                and GameState.canCastle(userClicks[0], userClicks[1])
+            ):
+                GameState.castle(userClicks[0], userClicks[1])
+                print("Made Castle Move")
+            elif (userClicks[1], userClicks[0]) in validMoves:
                 if GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "P" and (
                     (userClicks[1][0] == 0) or (userClicks[1][0] == 7)
                 ):
-                    handlePawnPromotion(userClicks)  # TODO: FIX
+                    print("Pawn Promotion")
+                    handlePawnPromotion(userClicks, screen, toHighlight)  # TODO: Freezes
                 elif GameState.make_if_en_passant((userClicks[0], userClicks[1])):
                     print(
                         "Made En Passant Move"
                     )  # En passant move handled within make_if_en_passant.
-                # Check for castling move.
-                elif (
-                    GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "K"
-                    and GameState.board[userClicks[1][0]][userClicks[1][1]][1] == "R"
-                    and GameState.canCastle(userClicks[0], userClicks[1])
-                ):
-                    GameState.castle(userClicks[0], userClicks[1])
-                    print("Made Castle Move")
                 else:
+                    print("Regular Move")
                     # Make a regular move.
                     move = ChessEngine.Move(
                         userClicks[0], userClicks[1], GameState.board
                     )
                     GameState.makeMove(move, None)
-                userClicks.clear()
             else:
+                print("reset")
                 userClicks[0] = userClicks[1]
                 del userClicks[1]  # Delete the item at index 1
+        elif len(userClicks) == 2:
+            print("Remove Extra")
+            userClicks.clear()
+            userClicks.append((squareY, squareX))
         else:
+            print("Append point")
             userClicks.append((squareY, squareX))
 
-        print(userClicks, "Mouse Down")
-        # If the move list has two positions and the move is invalid, reset the move list.
 
-
-def handlePawnPromotion(userClicks):
+def handlePawnPromotion(userClicks, screen, toHighlight):
     # Handle pawn promotion
-    move = ChessEngine.Move(*userClicks, GameState.board)
-    GameState.pawnPromotion(
-        (
-            (userClicks[1][0], userClicks[1][1]),
-            (userClicks[0][0], userClicks[0][1]),
-        ),
-        SCREEN,
+    drawGameState(screen, GameState, userClicks, toHighlight)
+    p.display.flip()
+    piece = GameState.pawnPromotion(
+        ((userClicks[1][0], userClicks[1][1]), (userClicks[0][0], userClicks[0][1])),
+        screen,
     )
-    selectedPieceMove = ChessEngine.Move(userClicks[1], userClicks[1], GameState.board)
-    GameState.makeMove(move, selectedPieceMove)
+    print(2)
+    move = ChessEngine.Move(userClicks[0], userClicks[1], GameState.board)
+    GameState.makeMove(move, None)
+    GameState.movePiece(*userClicks[1], piece)
+    print(3)
+    
+    """ # Handle pawn promotion.
+    moveC = ChessEngine.Move(move[0], move[1], GameState.board)
+    GameState.makeMove(moveC, None)
+    drawGameState(screen, GameState, move, toHighlight)
+    p.display.flip()
+    GameState.pawnPromotion(
+        ((move[1][0], move[1][1]), (move[0][0], move[0][1])), screen
+    )"""
 
 
 if __name__ == "__main__":
