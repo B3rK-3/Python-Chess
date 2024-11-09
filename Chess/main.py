@@ -1,177 +1,314 @@
 """
 Main.py file is responsible for running the game engine. Will handle user input and GUI.
 """
+
 import pygame as p
 import pygame.font
 
-from Python_Chess_Engine.Chess import ChessEngine
+import ChessEngine
 
-WIDTH = HEIGHT = 600
-SIZE = 8
-SQ_EACH_SIZE = HEIGHT // SIZE
-MAX_FPS = 15
-IMAGES = {}
+# Set up constants for the game dimensions and settings.
+WIDTH = HEIGHT = 600  # The height and width of the game window.
+SIZE = 8  # The size of the chessboard (8x8).
+SQ_EACH_SIZE = HEIGHT // SIZE  # The size of each square on the chessboard.
+MAX_FPS = 15  # Maximum frames per second (controls the game speed).
 
-def load_images():
+# Global Game Values
+IMAGES = {}  # A dictionary to store images of the chess pieces.
+GameState = (
+    ChessEngine.GameState()
+)  # Create a GameState object to keep track of the game state.
+SCREEN = None
+CLOCK = None
+RUNNING = True  # A flag to control the main loop.
+ValidMoves = None
+
+
+def main():
     """
-    INITIALIZING A GLOBAL DICT OF IMAGES. ONLY LOADED ONCE
+    The main driver for the chess game. This function handles user input and updates the graphics.
     """
-    p_names = ['wP', 'wR', 'wB', 'wN', 'wQ', 'wK', 'bP', 'bR', 'bB', 'bN', 'bQ', 'bK']
-    for e in p_names:
-        IMAGES[e] = p.transform.scale(p.image.load('img/' + e + '.png'), (SQ_EACH_SIZE, SQ_EACH_SIZE))
-
-def main(): # Driver code for the main chess game
-    p.init()
-    load_images() # done only once to save memory
-    screen = p.display.set_mode((WIDTH, HEIGHT))
-    p.display.set_caption('CHESS IN PYTHON')
-    clock = p.time.Clock()
-    FPS = MAX_FPS
-    gs = ChessEngine.GameState()
-    running = True
-    move = [] # two tuples [(7,7), (6,3)] will store where the user wants to move the piece to
-    mpx = 0
-    mpy = 0
-    vMoves = gs.genValidMoves(gs.board)
-    highlight = []
-    en_passant = False
-    while running:
-        for e in p.event.get():
-            if e.type == p.QUIT:
-                running = False
-                exit("QUIT")
-            elif e.type == p.MOUSEBUTTONUP and e.button == 3:
-                hx, hy = p.mouse.get_pos()
-                hy = hy//SQ_EACH_SIZE
-                hx = hx//SQ_EACH_SIZE
-                if (hy,hx) not in highlight:
-                    highlight.append((hy,hx))
-                else:
-                    highlight.remove((hy,hx))
-            elif e.type == p.MOUSEBUTTONDOWN and e.button == 1:
-                mx, my = p.mouse.get_pos()
-                if len(move) == 2 and ((move[1][0], move[1][1]), (move[0][0], move[0][1])) not in vMoves:
-                    move.clear()
-                if mx < HEIGHT and my < WIDTH:
-                    mpx = mx//SQ_EACH_SIZE
-                    mpy = my//SQ_EACH_SIZE
-                    move.append((mpy, mpx))
-                    print(move, "DOWN")
-                    if len(move) == 2 and ((move[1][0], move[1][1]),(move[0][0], move[0][1])) not in vMoves:
-                        move = [move[1]]
+    global RUNNING
+    setPyGameValues()
+    loadImages()  # Load images once to save memory.
+    generateValidMoves()
+    userClicks = []  # A list to store the user clicks
+    toHighlight = []  # A list to keep track of squares to highlight.
+    drawGameState(SCREEN, GameState, userClicks, toHighlight)
+    p.display.flip()
+    while RUNNING:
+        eventHandler(toHighlight, userClicks)
 
 
-            elif e.type == p.MOUSEBUTTONUP and e.button == 1:
-                mx, my = p.mouse.get_pos()
-                my = my//SQ_EACH_SIZE
-                mx = mx//SQ_EACH_SIZE
-                if not (my,mx) in move:
-                    move.append((my,mx))
-                print(move, "UP")
-                if len(move) == 2 and gs.board[move[0][0]][move[0][1]] != "__": #make sure that the dragged is not empty and within bounds
-                    #for the if condition the last condition makes sure that the we are not trying to drag it into the same place (it messes with the click move property)
-                    if ((move[1][0], move[1][1]), (move[0][0], move[0][1])) in vMoves and gs.board[move[0][0]][move[0][1]][1] == "P" and ((move[1][0] == 0) or (move[1][0] == 7)):
-                        moveC = ChessEngine.Move(move[0], move[1], gs.board)
-                        gs.makeMove(moveC, None)
-                        draw_game_state(screen, gs, move, highlight)
-                        p.display.flip()
-                        gs.pawnPromotion(((move[1][0], move[1][1]), (move[0][0], move[0][1])), screen)
-                        vMoves = gs.genValidMoves(gs.board)  # gen new valid moves
-                    else:
-                        if ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves and gs.make_if_en_passant(((move[0][0], move[0][1]), (move[1][0], move[1][1]))):
-                            pass
-                        else:
-                            if gs.board[mpy][mpx][1] == "K" and gs.board[my][mx][1] == "R":
-                                gs.castleMove((my, mx), (mpy, mpx))
-                                vMoves = gs.genValidMoves(gs.board)
-                            elif ((move[1][0], move[1][1]),(move[0][0], move[0][1])) in vMoves:
-                                moveC = ChessEngine.Move(move[0], move[1], gs.board)
-                                gs.makeMove(moveC, None)
-                                highlight = []
-                                vMoves = gs.genValidMoves(gs.board) #gen new valid moves
-                                mpx, mpy = 1000, 1000
-                            else:
-                                move = [move[1]]
-                elif len(move) == 2:
-                    move = [move[1]]
-            elif e.type == p.KEYDOWN:
-                if e.key == p.K_LEFT:
-                    gs.undoMove()
-                    vMoves = gs.genValidMoves(gs.board)  # gen new valid moves
-                    move.clear()
-
-            p.display.flip()
-        draw_game_state(screen, gs, move, highlight)
-        clock.tick(MAX_FPS)
-        p.display.flip()
-
-
-def draw_game_state(screen, gs, draw, highlight):
+def drawGameState(screen, gs, draw, highlight):
     """
-    Responsible for graphics game state
-    :param screen:
-    :param gs:
-    :return:
+    Responsible for drawing the current game state on the screen.
+    :param screen: The game window where everything is drawn.
+    :param gs: The current game state object.
+    :param draw: A list of squares involved in the current move.
+    :param highlight: A list of squares to highlight.
     """
-    draw_board(screen, draw, highlight) # helper function to draw the board
-    draw_pieces(screen, gs.board) # helper function to draw the pieces
-    draw_places(screen)
+    draw_board(screen, draw, highlight)  # Draw the chessboard.
+    draw_pieces(screen, gs.board)  # Draw the chess pieces on the board.
+    draw_places(screen)  # Draw the ranks and files labels.
+
 
 def draw_board(screen, draw, highlight):
     """
-    draw the board
-    :param screen:
-    :return:
+    Draw the chessboard with alternating colors and highlighted squares.
+    :param screen: The game window where everything is drawn.
+    :param draw: A list of squares involved in the current move.
+    :param highlight: A list of squares to highlight.
     """
-    white = True
+    white = True  # A flag to alternate between white and black squares.
     for r in range(SIZE):
         for c in range(SIZE):
-            if (r,c) in highlight:
-                p.draw.rect(screen, p.Color(255, 204, 0),(c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+            if (r, c) in highlight:
+                # Highlight specific squares (e.g., selected or targeted squares).
+                p.draw.rect(
+                    screen,
+                    p.Color(255, 204, 0),  # Color for highlighted squares.
+                    (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE),
+                )
             else:
-                if (r,c) in draw:
-                    p.draw.rect(screen, p.Color(255, 255, 102),(c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+                if (r, c) in draw:
+                    # Highlight squares involved in the current move.
+                    p.draw.rect(
+                        screen,
+                        p.Color(255, 255, 102),  # Color for move highlights.
+                        (
+                            c * SQ_EACH_SIZE,
+                            r * SQ_EACH_SIZE,
+                            SQ_EACH_SIZE,
+                            SQ_EACH_SIZE,
+                        ),
+                    )
                 else:
+                    # Draw regular squares with alternating colors.
                     if white:
-                        p.draw.rect(screen, p.Color(227, 193, 111), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+                        # Light squares.
+                        p.draw.rect(
+                            screen,
+                            p.Color(227, 193, 111),  # Light square color.
+                            (
+                                c * SQ_EACH_SIZE,
+                                r * SQ_EACH_SIZE,
+                                SQ_EACH_SIZE,
+                                SQ_EACH_SIZE,
+                            ),
+                        )
                     else:
-                        p.draw.rect(screen, p.Color(184, 139, 74), (c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
-            white = not white
-        white = not white
+                        # Dark squares.
+                        p.draw.rect(
+                            screen,
+                            p.Color(184, 139, 74),  # Dark square color.
+                            (
+                                c * SQ_EACH_SIZE,
+                                r * SQ_EACH_SIZE,
+                                SQ_EACH_SIZE,
+                                SQ_EACH_SIZE,
+                            ),
+                        )
+            white = not white  # Switch color for the next square.
+        white = not white  # Switch color at the end of each row.
+
+
 def draw_pieces(screen, board):
     """
-    draw the pieces
-    :param screen:
-    :param gs:1
-    :return:
+    Draw the chess pieces on the board.
+    :param screen: The game window where everything is drawn.
+    :param board: The current state of the chessboard.
     """
     for r in range(SIZE):
         for c in range(SIZE):
-            pc = board[r][c]
-            if pc != "__": #not empty
-                screen.blit(IMAGES[pc], p.Rect(c*SQ_EACH_SIZE, r*SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE))
+            pc = board[r][c]  # Get the piece at the current position.
+            if pc != "__":  # If the square is not empty.
+                # Draw the piece image on the board.
+                screen.blit(
+                    IMAGES[pc],
+                    p.Rect(
+                        c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE
+                    ),
+                )
+
+
 def draw_places(screen):
-    letters = 'abcdefgh'
-    font = pygame.font.SysFont("Arial", 15)
-    colors = ((255, 204, 117), (153, 102, 51))
-    white = 0
-    for i in range(1,len(letters)+1):
-        f = font.render(letters[i-1], True, colors[white])
-        screen.blit(f, (64 * i+i*11-10+(3 if letters[i-1] == 'f' else 0), HEIGHT-15-(3 if letters[i-1] == 'g' or letters[i-1] == 'h' else 0)))
+    """
+    Draw the rank (numbers) and file (letters) labels on the board.
+    :param screen: The game window where everything is drawn.
+    """
+    letters = "abcdefgh"  # File labels.
+    font = pygame.font.SysFont("Arial", 15)  # Font for the labels.
+    colors = ((255, 204, 117), (153, 102, 51))  # Colors for the labels.
+    white = 0  # A flag to alternate label colors.
+
+    for i in range(1, len(letters) + 1):
+        # Draw file labels at the bottom of the board.
+        f = font.render(letters[i - 1], True, colors[white])
+        screen.blit(
+            f,
+            (
+                64 * i + i * 11 - 10 + (3 if letters[i - 1] == "f" else 0),
+                HEIGHT
+                - 15
+                - (3 if letters[i - 1] == "g" or letters[i - 1] == "h" else 0),
+            ),
+        )
+        # Draw rank labels on the left side of the board.
         f = font.render(str(i), True, colors[(white if not white else 1)])
-        screen.blit(f, (1, 75 * (9-i)-75))
+        screen.blit(f, (1, 75 * (9 - i) - 75))
         if not white:
-            white+=1
+            white += 1
         else:
-            white-=1
-
-if __name__ == '__main__':
-    main()
+            white -= 1
 
 
+def setPyGameValues():
+    global SCREEN
+    global CLOCK
+    p.init()  # Initialize all imported pygame modules.
+    SCREEN = p.display.set_mode((WIDTH, HEIGHT))  # Set up the game window.
+    p.display.set_caption("CHESS IN PYTHON")  # Set the window title.
+    CLOCK = p.time.Clock()  # Create a clock object to manage updates.
 
 
+def generateValidMoves():
+    global ValidMoves
+    ValidMoves = GameState.genValidMoves(
+        GameState.board
+    )  # Generate all valid moves for the current board state.
 
 
+def loadImages():
+    """
+    Initialize a global dictionary of images. This function loads images for all chess pieces
+    and scales them to fit the squares on the chessboard. It is called once at the start.
+    """
+    p_names = [
+        "wP",
+        "wR",
+        "wB",
+        "wN",
+        "wQ",
+        "wK",
+        "bP",
+        "bR",
+        "bB",
+        "bN",
+        "bQ",
+        "bK",
+    ]  # List of piece names.
+    for piece in p_names:
+        # Load and scale the image for each piece, then store it in the IMAGES dictionary.
+        IMAGES[piece] = p.transform.scale(
+            p.image.load(f"./img/{piece}.png"), (SQ_EACH_SIZE, SQ_EACH_SIZE)
+        )
 
 
+def eventHandler(toHighlight, userClicks):
+    for event in p.event.get():
+        if event.type == p.QUIT:
+            p.quit()
+            exit("QUIT")
+        elif event.type == p.MOUSEBUTTONUP and event.button == 3:
+            # Function to highlight selected squares
+            squareX, squareY = findSquare(*p.mouse.get_pos())
+            squareHighlight(squareX, squareY, toHighlight)
+            generateValidMoves()  # Generate new valid moves.
+            toHighlight.clear()
+            drawGameState(SCREEN, GameState, userClicks, toHighlight)
+        elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
+            handleButtonDown(*p.mouse.get_pos(), userClicks, toHighlight)
+            generateValidMoves()  # Generate new valid moves.
+            toHighlight.clear()
+            drawGameState(SCREEN, GameState, userClicks, toHighlight)
+        elif event.type == p.KEYDOWN and event.key == p.K_LEFT:
+            handleLeftButtonDown(userClicks)
+            generateValidMoves()  # Generate new valid moves.
+            toHighlight.clear()
+            drawGameState(SCREEN, GameState, userClicks, toHighlight)
+        CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
+        p.display.flip()  # Update the display.
+
+
+def findSquare(x, y):
+    # Convert pixel coordinates to board coordinates.
+    x = x // SQ_EACH_SIZE
+    y = y // SQ_EACH_SIZE
+    return (x, y)
+
+
+def handleLeftButtonDown(userClicks):
+    # Undo the last move when the left arrow key is pressed.
+    GameState.undoMove()
+    userClicks.clear()  # Clear the move list.
+
+
+def squareHighlight(x, y, toHighlight):
+    if (y, x) not in toHighlight:
+        toHighlight.append((y, x))  # Add the square to the highlight list.
+    else:
+        toHighlight.remove(
+            (y, x)
+        )  # Remove the square from the highlight list if it's already highlighted.
+
+
+def handleButtonDown(mouseX, mouseY, userClicks, toHighlight):
+    # Check its within bounds
+    # Not elif because we still want to update after clearing the userClicks
+    if mouseX < WIDTH and mouseY < HEIGHT:
+        # Get the square coords
+        squareX, squareY = findSquare(mouseX, mouseY)
+        if len(userClicks) == 1:
+            userClicks.append((squareY, squareX))
+            print(userClicks)
+            if (userClicks[1], userClicks[0]) in ValidMoves:
+                if GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "P" and (
+                    (userClicks[1][0] == 0) or (userClicks[1][0] == 7)
+                ):
+                    handlePawnPromotion(userClicks)  # TODO: FIX
+                elif GameState.make_if_en_passant((userClicks[0], userClicks[1])):
+                    print(
+                        "Made En Passant Move"
+                    )  # En passant move handled within make_if_en_passant.
+                # Check for castling move.
+                elif (
+                    GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "K"
+                    and GameState.board[userClicks[1][0]][userClicks[1][1]][1] == "R"
+                    and GameState.canCastle(userClicks[0], userClicks[1])
+                ):
+                    GameState.castle(userClicks[0], userClicks[1])
+                    print("Made Castle Move")
+                else:
+                    # Make a regular move.
+                    move = ChessEngine.Move(
+                        userClicks[0], userClicks[1], GameState.board
+                    )
+                    GameState.makeMove(move, None)
+                userClicks.clear()
+            else:
+                userClicks[0] = userClicks[1]
+                del userClicks[1]  # Delete the item at index 1
+        else:
+            userClicks.append((squareY, squareX))
+
+        print(userClicks, "Mouse Down")
+        # If the move list has two positions and the move is invalid, reset the move list.
+
+
+def handlePawnPromotion(userClicks):
+    # Handle pawn promotion
+    move = ChessEngine.Move(*userClicks, GameState.board)
+    GameState.pawnPromotion(
+        (
+            (userClicks[1][0], userClicks[1][1]),
+            (userClicks[0][0], userClicks[0][1]),
+        ),
+        SCREEN,
+    )
+    selectedPieceMove = ChessEngine.Move(userClicks[1], userClicks[1], GameState.board)
+    GameState.makeMove(move, selectedPieceMove)
+
+
+if __name__ == "__main__":
+    main()  # Start the game.
