@@ -12,6 +12,10 @@ WIDTH = HEIGHT = 600  # The height and width of the game window.
 SIZE = 8  # The size of the chessboard (8x8).
 SQ_EACH_SIZE = HEIGHT // SIZE  # The size of each square on the chessboard.
 MAX_FPS = 15  # Maximum frames per second (controls the game speed).
+LIGHT_SQUARE_COLOR = p.Color(227, 193, 111)
+DARK_SQUARE_COLOR = p.Color(184, 139, 74)
+HIGHLIGHT_COLOR = p.Color(255, 204, 0)
+MOVE_HIGHLIGHT_COLOR = p.Color(255, 255, 102)
 
 # Global Game Values
 IMAGES = {}  # A dictionary to store images of the chess pieces.
@@ -20,6 +24,7 @@ GameState = (
 )  # Create a GameState object to keep track of the game state.
 CLOCK = None
 validMoves = None
+
 
 def main():
     """
@@ -50,63 +55,22 @@ def drawGameState(screen, gs, draw, highlight):
 
 
 def draw_board(screen, draw, highlight):
-    """
-    Draw the chessboard with alternating colors and highlighted squares.
-    :param screen: The game window where everything is drawn.
-    :param draw: A list of squares involved in the current move.
-    :param highlight: A list of squares to highlight.
-    """
-    white = True  # A flag to alternate between white and black squares.
+    colors = [
+        LIGHT_SQUARE_COLOR,
+        DARK_SQUARE_COLOR,
+    ]  # Light and dark square colors
     for r in range(SIZE):
         for c in range(SIZE):
+            color = colors[(r + c) % 2]  # Alternate color based on row and column
             if (r, c) in highlight:
-                # Highlight specific squares (e.g., selected or targeted squares).
-                p.draw.rect(
-                    screen,
-                    p.Color(255, 204, 0),  # Color for highlighted squares.
-                    (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE),
-                )
-            else:
-                if (r, c) in draw:
-                    # Highlight squares involved in the current move.
-                    p.draw.rect(
-                        screen,
-                        p.Color(255, 255, 102),  # Color for move highlights.
-                        (
-                            c * SQ_EACH_SIZE,
-                            r * SQ_EACH_SIZE,
-                            SQ_EACH_SIZE,
-                            SQ_EACH_SIZE,
-                        ),
-                    )
-                else:
-                    # Draw regular squares with alternating colors.
-                    if white:
-                        # Light squares.
-                        p.draw.rect(
-                            screen,
-                            p.Color(227, 193, 111),  # Light square color.
-                            (
-                                c * SQ_EACH_SIZE,
-                                r * SQ_EACH_SIZE,
-                                SQ_EACH_SIZE,
-                                SQ_EACH_SIZE,
-                            ),
-                        )
-                    else:
-                        # Dark squares.
-                        p.draw.rect(
-                            screen,
-                            p.Color(184, 139, 74),  # Dark square color.
-                            (
-                                c * SQ_EACH_SIZE,
-                                r * SQ_EACH_SIZE,
-                                SQ_EACH_SIZE,
-                                SQ_EACH_SIZE,
-                            ),
-                        )
-            white = not white  # Switch color for the next square.
-        white = not white  # Switch color at the end of each row.
+                color = HIGHLIGHT_COLOR
+            elif (r, c) in draw:
+                color = MOVE_HIGHLIGHT_COLOR
+            p.draw.rect(
+                screen,
+                color,
+                (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE),
+            )
 
 
 def draw_pieces(screen, board):
@@ -166,6 +130,7 @@ def setPyGameValues():
     CLOCK = p.time.Clock()  # Create a clock object to manage updates.
     return p.display.set_mode((WIDTH, HEIGHT))  # Set up the game window.
 
+
 def generateValidMoves():
     global validMoves
     validMoves = GameState.genValidMoves(
@@ -200,6 +165,7 @@ def loadImages():
 
 
 def eventHandler(toHighlight, userClicks, screen):
+    redraw = False
     for event in p.event.get():
         if event.type == p.QUIT:
             p.quit()
@@ -208,21 +174,21 @@ def eventHandler(toHighlight, userClicks, screen):
             # Function to highlight selected squares
             squareX, squareY = findSquare(*p.mouse.get_pos())
             squareHighlight(squareX, squareY, toHighlight)
-            generateValidMoves()  # Generate new valid moves.
             toHighlight.clear()
-            drawGameState(screen, GameState, userClicks, toHighlight)
+            redraw = True
         elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
             handleSquareSelection(*p.mouse.get_pos(), userClicks, toHighlight, screen)
-            generateValidMoves()  # Generate new valid moves.
             toHighlight.clear()
-            drawGameState(screen, GameState, userClicks, toHighlight)
+            redraw = True
         elif event.type == p.KEYDOWN and event.key == p.K_LEFT:
             handleLeftButtonDown(userClicks)
-            generateValidMoves()  # Generate new valid moves.
             toHighlight.clear()
-            drawGameState(screen, GameState, userClicks, toHighlight)
-        CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
-        p.display.flip()  # Update the display.
+            redraw = True
+    if redraw:
+        drawGameState(screen, GameState, userClicks, toHighlight)
+        generateValidMoves()
+    CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
+    p.display.flip()  # Update the display.
 
 
 def findSquare(x, y):
@@ -248,6 +214,7 @@ def squareHighlight(x, y, toHighlight):
 
 
 def handleSquareSelection(mouseX, mouseY, userClicks, toHighlight, screen):
+    # TODO: turn this modular!
     # Check its within bounds
     # Not elif because we still want to update after clearing the userClicks
     if mouseX < WIDTH and mouseY < HEIGHT:
@@ -269,7 +236,7 @@ def handleSquareSelection(mouseX, mouseY, userClicks, toHighlight, screen):
                     (userClicks[1][0] == 0) or (userClicks[1][0] == 7)
                 ):
                     print("Pawn Promotion")
-                    handlePawnPromotion(userClicks, screen, toHighlight)  # TODO: Freezes
+                    handlePawnPromotion(userClicks, screen, toHighlight)
                 elif GameState.make_if_en_passant((userClicks[0], userClicks[1])):
                     print(
                         "Made En Passant Move"
@@ -302,20 +269,9 @@ def handlePawnPromotion(userClicks, screen, toHighlight):
         ((userClicks[1][0], userClicks[1][1]), (userClicks[0][0], userClicks[0][1])),
         screen,
     )
-    print(2)
     move = ChessEngine.Move(userClicks[0], userClicks[1], GameState.board)
     GameState.makeMove(move, None)
     GameState.movePiece(*userClicks[1], piece)
-    print(3)
-    
-    """ # Handle pawn promotion.
-    moveC = ChessEngine.Move(move[0], move[1], GameState.board)
-    GameState.makeMove(moveC, None)
-    drawGameState(screen, GameState, move, toHighlight)
-    p.display.flip()
-    GameState.pawnPromotion(
-        ((move[1][0], move[1][1]), (move[0][0], move[0][1])), screen
-    )"""
 
 
 if __name__ == "__main__":
