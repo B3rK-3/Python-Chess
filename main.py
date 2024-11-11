@@ -216,49 +216,68 @@ def squareHighlight(x, y, toHighlight):
 def handleSquareSelection(mouseX, mouseY, userClicks, toHighlight, screen):
     # TODO: turn this modular!
     # Check its within bounds
-    # Not elif because we still want to update after clearing the userClicks
-    if mouseX < WIDTH and mouseY < HEIGHT:
-        # Get the square coords
-        squareX, squareY = findSquare(mouseX, mouseY)
-        if len(userClicks) == 1:
-            userClicks.append((squareY, squareX))
-            print(userClicks, "Mouse Down")
-            # Check for castling move.
-            if (
-                GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "K"
-                and GameState.board[userClicks[1][0]][userClicks[1][1]][1] == "R"
-                and GameState.canCastle(userClicks[0], userClicks[1])
-            ):
-                GameState.castle(userClicks[0], userClicks[1])
-                print("Made Castle Move")
-            elif (userClicks[1], userClicks[0]) in validMoves:
-                if GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "P" and (
-                    (userClicks[1][0] == 0) or (userClicks[1][0] == 7)
-                ):
-                    print("Pawn Promotion")
-                    handlePawnPromotion(userClicks, screen, toHighlight)
-                elif GameState.make_if_en_passant((userClicks[0], userClicks[1])):
-                    print(
-                        "Made En Passant Move"
-                    )  # En passant move handled within make_if_en_passant.
-                else:
-                    print("Regular Move")
-                    # Make a regular move.
-                    move = ChessEngine.Move(
-                        userClicks[0], userClicks[1], GameState.board
-                    )
-                    GameState.makeMove(move, None)
+    if not (mouseX < WIDTH and mouseY < HEIGHT):
+        return  # out of bounds
+
+    # Get the square coords
+    squareX, squareY = findSquare(mouseX, mouseY)
+    if len(userClicks) == 1:
+        userClicks.append((squareY, squareX))
+        print(userClicks, "Mouse Down")
+        # Check for castling move.
+        if castleChecks(userClicks):
+            castle(userClicks)
+            print("Made Castle Move")
+        elif (userClicks[1], userClicks[0]) in validMoves:
+            if pawnChecks(userClicks):
+                print("Pawn Promotion")
+                handlePawnPromotion(userClicks, screen, toHighlight)
+            elif enPassantChecks(userClicks):
+                print(
+                    "Made En Passant Move"
+                )  # En passant move handled within make_if_en_passant.
             else:
-                print("reset")
-                userClicks[0] = userClicks[1]
-                del userClicks[1]  # Delete the item at index 1
-        elif len(userClicks) == 2:
-            print("Remove Extra")
-            userClicks.clear()
-            userClicks.append((squareY, squareX))
+                print("Regular Move")
+                handleMove(userClicks)
         else:
-            print("Append point")
-            userClicks.append((squareY, squareX))
+            print("reset")
+            userClicks[0] = userClicks[1]
+            del userClicks[1]  # Delete the item at index 1
+    elif len(userClicks) == 2:
+        print("Remove Extra")
+        userClicks.clear()
+        userClicks.append((squareY, squareX))
+    else:
+        print("Append point")
+        userClicks.append((squareY, squareX))
+
+
+def enPassantChecks(userClicks):
+    return GameState.make_if_en_passant((userClicks[0], userClicks[1]))
+
+
+def castleChecks(userClicks):
+    return (
+        GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "K"
+        and GameState.board[userClicks[1][0]][userClicks[1][1]][1] == "R"
+        and GameState.canCastle(userClicks[0], userClicks[1])
+    )
+
+
+def pawnChecks(userClicks):
+    return GameState.board[userClicks[0][0]][userClicks[0][1]][1] == "P" and (
+        (userClicks[1][0] == 0) or (userClicks[1][0] == 7)
+    )
+
+
+def castle(userClicks):
+    GameState.castle(userClicks[0], userClicks[1])
+
+
+def handleMove(userClicks):
+    # Make a regular move.
+    move = ChessEngine.Move(userClicks[0], userClicks[1], GameState.board)
+    GameState.makeMove(move, None)
 
 
 def handlePawnPromotion(userClicks, screen, toHighlight):

@@ -107,7 +107,6 @@ class GameState:
             if r == row:
                 print(4)
                 return False
-        print("can castle")
         return True
 
     def castle(self, kingPos, rookPos):
