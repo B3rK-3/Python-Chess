@@ -14,8 +14,9 @@ SQ_EACH_SIZE = HEIGHT // SIZE  # The size of each square on the chessboard.
 MAX_FPS = 15  # Maximum frames per second (controls the game speed).
 LIGHT_SQUARE_COLOR = p.Color(227, 193, 111)
 DARK_SQUARE_COLOR = p.Color(184, 139, 74)
-HIGHLIGHT_COLOR = p.Color(255, 204, 0)
-MOVE_HIGHLIGHT_COLOR = p.Color(255, 255, 102)
+HIGHLIGHT_COLOR = (255, 204, 0, 225)
+MOVE_HIGHLIGHT_COLOR = (255, 255, 102, 200)
+POSSIBLE_MOVES = (255, 234, 0, 128)
 
 # Global Game Values
 IMAGES = {}  # A dictionary to store images of the chess pieces.
@@ -35,13 +36,14 @@ def main():
     generateValidMoves()
     userClicks = []  # A list to store the user clicks
     toHighlight = []  # A list to keep track of squares to highlight.
-    drawGameState(screen, GameState, userClicks, toHighlight)
+    possibleMoves = []  # A list of possilbe coordinates to which the selected piece can move to
+    drawGameState(screen, GameState, userClicks, toHighlight, possibleMoves)
     p.display.flip()
     while True:
-        eventHandler(toHighlight, userClicks, screen)
+        eventHandler(toHighlight, userClicks, screen, possibleMoves)
 
 
-def drawGameState(screen, gs, draw, highlight):
+def drawGameState(screen, gs, draw, highlight, possibleMoves):
     """
     Responsible for drawing the current game state on the screen.
     :param screen: The game window where everything is drawn.
@@ -49,28 +51,59 @@ def drawGameState(screen, gs, draw, highlight):
     :param draw: A list of squares involved in the current move.
     :param highlight: A list of squares to highlight.
     """
-    draw_board(screen, draw, highlight)  # Draw the chessboard.
+    draw_board(screen, draw, highlight, possibleMoves)  # Draw the chessboard.
     draw_pieces(screen, gs.board)  # Draw the chess pieces on the board.
     draw_places(screen)  # Draw the ranks and files labels.
 
 
-def draw_board(screen, draw, highlight):
+def draw_board(screen, draw, highlight, possibleMoves):
     colors = [
         LIGHT_SQUARE_COLOR,
         DARK_SQUARE_COLOR,
     ]  # Light and dark square colors
     for r in range(SIZE):
         for c in range(SIZE):
+            modified = False
             color = colors[(r + c) % 2]  # Alternate color based on row and column
             if (r, c) in highlight:
                 color = HIGHLIGHT_COLOR
+                modified = True
             elif (r, c) in draw:
+                p.draw.rect(
+                    screen,
+                    color,
+                    (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE),
+                )
                 color = MOVE_HIGHLIGHT_COLOR
-            p.draw.rect(
-                screen,
-                color,
-                (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE),
-            )
+                modified = True
+            if modified:
+                # Create a semi-transparent surface
+                overlay = p.Surface(
+                    (SQ_EACH_SIZE, SQ_EACH_SIZE), p.SRCALPHA
+                )  # Use SRCALPHA for transparency
+                overlay.fill(
+                    color
+                )  # Add an alpha value (0-255), 128 is semi-transparent
+
+                # Draw the transparent rectangle on the screen
+                screen.blit(overlay, (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE))
+            else:
+                p.draw.rect(
+                    screen,
+                    color,
+                    (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE),
+                )
+    for r, c in possibleMoves:
+        # Create a semi-transparent surface
+        overlay = p.Surface(
+            (SQ_EACH_SIZE, SQ_EACH_SIZE), p.SRCALPHA
+        )  # Use SRCALPHA for transparency
+        overlay.fill(
+            POSSIBLE_MOVES
+        )  # Add an alpha value (0-255), 128 is semi-transparent
+
+        # Draw the transparent rectangle on the screen
+        screen.blit(overlay, (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE))
 
 
 def draw_pieces(screen, board):
@@ -164,7 +197,7 @@ def loadImages():
         )
 
 
-def eventHandler(toHighlight, userClicks, screen):
+def eventHandler(toHighlight, userClicks, screen, possibleMoves):
     redraw = False
     for event in p.event.get():
         if event.type == p.QUIT:
@@ -174,18 +207,21 @@ def eventHandler(toHighlight, userClicks, screen):
             # Function to highlight selected squares
             squareX, squareY = findSquare(*p.mouse.get_pos())
             squareHighlight(squareX, squareY, toHighlight)
-            toHighlight.clear()
             redraw = True
         elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
-            handleSquareSelection(*p.mouse.get_pos(), userClicks, toHighlight, screen)
+            possibleMoves.clear()
+            handleSquareSelection(
+                *p.mouse.get_pos(), userClicks, toHighlight, screen, possibleMoves
+            )
             toHighlight.clear()
             redraw = True
         elif event.type == p.KEYDOWN and event.key == p.K_LEFT:
+            possibleMoves.clear()
             handleLeftButtonDown(userClicks)
             toHighlight.clear()
             redraw = True
     if redraw:
-        drawGameState(screen, GameState, userClicks, toHighlight)
+        drawGameState(screen, GameState, userClicks, toHighlight, possibleMoves)
         generateValidMoves()
     CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
     p.display.flip()  # Update the display.
@@ -213,12 +249,12 @@ def squareHighlight(x, y, toHighlight):
         )  # Remove the square from the highlight list if it's already highlighted.
 
 
-def handleSquareSelection(mouseX, mouseY, userClicks, toHighlight, screen):
-    # TODO: turn this modular!
+def handleSquareSelection(
+    mouseX, mouseY, userClicks, toHighlight, screen, possibleMoves
+):
     # Check its within bounds
     if not (mouseX < WIDTH and mouseY < HEIGHT):
         return  # out of bounds
-
     # Get the square coords
     squareX, squareY = findSquare(mouseX, mouseY)
     if len(userClicks) == 1:
@@ -231,7 +267,7 @@ def handleSquareSelection(mouseX, mouseY, userClicks, toHighlight, screen):
         elif (userClicks[1], userClicks[0]) in validMoves:
             if pawnChecks(userClicks):
                 print("Pawn Promotion")
-                handlePawnPromotion(userClicks, screen, toHighlight)
+                handlePawnPromotion(userClicks, screen, toHighlight, possibleMoves)
             elif enPassantChecks(userClicks):
                 print(
                     "Made En Passant Move"
@@ -239,17 +275,29 @@ def handleSquareSelection(mouseX, mouseY, userClicks, toHighlight, screen):
             else:
                 print("Regular Move")
                 handleMove(userClicks)
+        elif userClicks[0] == userClicks[1]:
+            userClicks.clear()
         else:
             print("reset")
             userClicks[0] = userClicks[1]
             del userClicks[1]  # Delete the item at index 1
+            highlightPosMoves(userClicks, screen, possibleMoves)
     elif len(userClicks) == 2:
         print("Remove Extra")
         userClicks.clear()
         userClicks.append((squareY, squareX))
+        highlightPosMoves(userClicks, screen, possibleMoves)
     else:
         print("Append point")
         userClicks.append((squareY, squareX))
+        highlightPosMoves(userClicks, screen, possibleMoves)
+
+
+def highlightPosMoves(piece, screen, possibleMoves):
+    piece = piece[0]
+    for toP, fromP in validMoves:
+        if piece == fromP:
+            possibleMoves.append(toP)
 
 
 def enPassantChecks(userClicks):
@@ -280,9 +328,9 @@ def handleMove(userClicks):
     GameState.makeMove(move, None)
 
 
-def handlePawnPromotion(userClicks, screen, toHighlight):
+def handlePawnPromotion(userClicks, screen, toHighlight, possibleMoves):
     # Handle pawn promotion
-    drawGameState(screen, GameState, userClicks, toHighlight)
+    drawGameState(screen, GameState, userClicks, toHighlight, possibleMoves)
     p.display.flip()
     piece = GameState.pawnPromotion(
         ((userClicks[1][0], userClicks[1][1]), (userClicks[0][0], userClicks[0][1])),
