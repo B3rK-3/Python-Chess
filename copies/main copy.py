@@ -101,7 +101,7 @@ def main():  # Driver code for the main chess game
                         if (
                             (move[1][0], move[1][1]),
                             (move[0][0], move[0][1]),
-                        ) in vMoves and gs.make_if_en_passant(
+                        ) in vMoves and gs.isEnPassant(
                             ((move[0][0], move[0][1]), (move[1][0], move[1][1]))
                         ):
                             pass
