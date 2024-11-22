@@ -14,7 +14,7 @@ SQ_EACH_SIZE = HEIGHT // SIZE  # The size of each square on the chessboard.
 MAX_FPS = 15  # Maximum frames per second (controls the game speed).
 LIGHT_SQUARE_COLOR = p.Color(227, 193, 111)
 DARK_SQUARE_COLOR = p.Color(184, 139, 74)
-HIGHLIGHT_COLOR = (255, 204, 0, 225)
+HIGHLIGHT_COLOR = (255, 204, 0, 100)
 MOVE_HIGHLIGHT_COLOR = (255, 255, 102, 200)
 POSSIBLE_MOVES = (255, 234, 0, 128)
 
@@ -41,6 +41,8 @@ def main():
     p.display.flip()
     while True:
         eventHandler(toHighlight, userClicks, screen, possibleMoves)
+        CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
+        p.display.flip()  # Update the display.
 
 
 def drawGameState(screen, gs, draw, highlight, possibleMoves):
@@ -81,12 +83,11 @@ def draw_board(screen, draw, highlight, possibleMoves):
                 overlay = p.Surface(
                     (SQ_EACH_SIZE, SQ_EACH_SIZE), p.SRCALPHA
                 )  # Use SRCALPHA for transparency
-                overlay.fill(
-                    color
-                )  # Add an alpha value (0-255), 128 is semi-transparent
-
-                # Draw the transparent rectangle on the screen
-                screen.blit(overlay, (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE))
+                p.draw.rect(
+                    screen,
+                    color,
+                    (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE, SQ_EACH_SIZE, SQ_EACH_SIZE),
+                )
             else:
                 p.draw.rect(
                     screen,
@@ -223,8 +224,6 @@ def eventHandler(toHighlight, userClicks, screen, possibleMoves):
     if redraw:
         drawGameState(screen, GameState, userClicks, toHighlight, possibleMoves)
         generateValidMoves()
-    CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
-    p.display.flip()  # Update the display.
 
 
 def findSquare(x, y):
@@ -259,36 +258,35 @@ def handleSquareSelection(
     squareX, squareY = findSquare(mouseX, mouseY)
     if len(userClicks) == 1:
         userClicks.append((squareY, squareX))
-        print(userClicks, "Mouse Down")
+        #print(userClicks, "Mouse Down")
         # Check for castling move.
         if castleChecks(userClicks):
             castle(userClicks)
-            print("Made Castle Move")
+            #print("Made Castle Move")
         elif (userClicks[1], userClicks[0]) in validMoves:
             if pawnChecks(userClicks):
-                print("Pawn Promotion")
+                #print("Pawn Promotion")
                 handlePawnPromotion(userClicks, screen, toHighlight, possibleMoves)
             elif enPassantChecks(userClicks):
-                print(
-                    "Made En Passant Move"
-                )  # En passant move handled within make_if_en_passant.
+                makeEnPassant(userClicks)
+                # print("Made En Passant Move")  # En passant move handled within make_if_en_passant.
             else:
-                print("Regular Move")
+                # print("Regular Move")
                 handleMove(userClicks)
         elif userClicks[0] == userClicks[1]:
             userClicks.clear()
         else:
-            print("reset")
+            # print("reset")
             userClicks[0] = userClicks[1]
             del userClicks[1]  # Delete the item at index 1
             highlightPosMoves(userClicks, screen, possibleMoves)
     elif len(userClicks) == 2:
-        print("Remove Extra")
+        # print("Remove Extra")
         userClicks.clear()
         userClicks.append((squareY, squareX))
         highlightPosMoves(userClicks, screen, possibleMoves)
     else:
-        print("Append point")
+        # print("Append point")
         userClicks.append((squareY, squareX))
         highlightPosMoves(userClicks, screen, possibleMoves)
 
@@ -301,7 +299,22 @@ def highlightPosMoves(piece, screen, possibleMoves):
 
 
 def enPassantChecks(userClicks):
-    return GameState.make_if_en_passant((userClicks[0], userClicks[1]))
+    isEnPassant = GameState.isEnPassant(userClicks)
+    return isEnPassant
+
+
+def makeEnPassant(userClicks):
+    moveObj = GameState.moveLog[-1]
+    # Create the en passant move.
+    moveObj = ChessEngine.Move(
+        userClicks,  # peice moved
+        # -----
+        (moveObj.moverEndSq, userClicks[1]),  # piece captured
+        # -----
+        GameState.board,
+        2,  # type of move
+    )
+    GameState.makeMove(moveObj)
 
 
 def castleChecks(userClicks):
@@ -324,8 +337,10 @@ def castle(userClicks):
 
 def handleMove(userClicks):
     # Make a regular move.
-    move = ChessEngine.Move(userClicks[0], userClicks[1], GameState.board)
-    GameState.makeMove(move, None)
+    move = ChessEngine.Move(
+        (userClicks[0], userClicks[1]), (userClicks[1], userClicks[1]), GameState.board
+    )
+    GameState.makeMove(move)
 
 
 def handlePawnPromotion(userClicks, screen, toHighlight, possibleMoves):
@@ -336,9 +351,14 @@ def handlePawnPromotion(userClicks, screen, toHighlight, possibleMoves):
         ((userClicks[1][0], userClicks[1][1]), (userClicks[0][0], userClicks[0][1])),
         screen,
     )
-    move = ChessEngine.Move(userClicks[0], userClicks[1], GameState.board)
-    GameState.makeMove(move, None)
-    GameState.movePiece(*userClicks[1], piece)
+    move = ChessEngine.Move(
+        (userClicks[0], userClicks[1]),
+        (userClicks[1], userClicks[1]),
+        GameState.board,
+        3,
+        piece,
+    )
+    GameState.makeMove(move)
 
 
 if __name__ == "__main__":
