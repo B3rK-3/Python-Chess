@@ -23,16 +23,93 @@ class GameState:
             ["bR", "__", "__", "__", "bK", "__", "__", "bR"],
             ["bP", "bP", "wP", "__", "bP", "bP", "wP", "bP"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
+            ["__", "__", "__", "__", "__", "__", "bR", "__"],
+            ["__", "__", "__", "__", "__", "__", "bQ", "__"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["__", "__", "__", "__", "bP", "__", "__", "__"],
-            ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["wP", "wP", "wP", "wP", "__", "wP", "wP", "wP"],
-            ["wR", "__", "__", "__", "wK", "__", "__", "wR"],
+            ["wP", "wP", "wP", "wP", "__", "__", "__", "__"],
+            ["wR", "__", "__", "__", "__", "__", "__", "wK"],
         ]
         # Indicates whose turn it is; True if it's white's turn, False if black's.
         self.isWhiteTurn = True
         # A log to keep track of all moves made in the game.
         self.moveLog: List["Move"] = []
+
+    def genValidMoves(self, board: list) -> list:
+        """
+        Generates all valid moves for the current player, accounting for checks and checkmates.
+
+        :Parameters:
+        - board: list
+            The current board state.
+
+        :Returns:
+        - list: A list of valid moves.
+        """
+        # Generate all possible moves (not necessarily valid).
+        self.posMoves = self.genPossibleMoves(board)
+        # Get the position of the current player's king.
+        self.kingPos = self.posOfPiece("wK" if self.isWhiteTurn else "bK")[0]
+        # Check if the king is in check.
+        toDelete = self.checkAroundKing(self.kingPos)
+        numOfChecks = 0
+        setToDelete = set()
+        for i, t in sorted(toDelete, reverse=True):
+            if t == 1:
+                numOfChecks += 1
+            if i in setToDelete:
+                continue
+            self.posMoves.pop(i)
+            setToDelete.add(i)
+        if self.posMoves == [] and numOfChecks:
+            # If there are no valid moves and the king is in check, it's checkmate.
+            self.moveLog[-1].checkOrMate = "#"
+            print("Checkmate!", ("Black wins!" if self.isWhiteTurn else "White wins!"))
+        elif self.posMoves == []:
+            # If there are no valid moves but the king is not in check, it's stalemate.
+            print("Stalemate!")
+        if self.moveLog:
+            print("Move: ", self.moveLog[-1])
+        return self.posMoves
+
+    def genPossibleMoves(self, board: list) -> list:
+        """
+        Generates all possible moves for the current player, without considering checks.
+
+        :Parameters:
+        - board: list
+            The current state of the board.
+
+        :Returns:
+        - list: A list of all possible moves for the current player.
+        """
+        possibleMoves = []
+        colors = ["w", "b"]  # Define colors for white and black pieces.
+        turn = 0 if self.isWhiteTurn else 1  # Determine whose turn it is.
+        for row in range(len(board)):
+            for col in range(len(board[0])):
+                piece = board[row][col]
+                if piece[0] == colors[turn]:
+                    # Generate moves based on the piece type.
+                    if piece[1] == "P":
+                        self.pawnMoves(
+                            row,
+                            col,
+                            piece,
+                            board,
+                            possibleMoves,
+                            colors[1 - turn],  # Opponent's color.
+                        )
+                    elif piece[1] == "N":
+                        self.knightMoves(row, col, piece, board, possibleMoves)
+                    elif piece[1] == "R":
+                        self.rookMoves(row, col, piece, board, possibleMoves)
+                    elif piece[1] == "B":
+                        self.bishopMoves(row, col, piece, board, possibleMoves)
+                    elif piece[1] == "Q":
+                        self.queenMoves(row, col, piece, board, possibleMoves)
+                    elif piece[1] == "K":
+                        self.kingMoves(row, col, piece, board, possibleMoves)
+        return possibleMoves
 
     def makeMove(self, moveObj: "Move") -> None:
         """
@@ -62,9 +139,16 @@ class GameState:
             )
         # Switch turn to the other player.
         self.isWhiteTurn = not self.isWhiteTurn
+        self.posMoves = self.genPossibleMoves(self.board)
         # Add the move to the move log.
+        deleteMoves = self.checkAroundKing(
+            self.posOfPiece("wK" if self.isWhiteTurn else "bK")[0]
+        )
+        for _, type in deleteMoves:
+            if type == 1:
+                moveObj.checkOrMate = "+"
+                break
         self.moveLog.append(moveObj)
-        print("Move: ", moveObj)
 
     def undoMove(self) -> None:
         """
@@ -129,14 +213,18 @@ class GameState:
             return False  # Both rooks have moved; cannot castle.
         # Generate opponent's moves to check for threats along the castling path.
         self.isWhiteTurn = not self.isWhiteTurn  # Switch turn to opponent.
-        oppM = [x[0] for x in self.genValidMoves(self.board)]  # Generate opponent's moves.
+        oppM = [
+            x[0] for x in self.genValidMoves(self.board)
+        ]  # Generate opponent's moves.
         self.isWhiteTurn = not self.isWhiteTurn  # Switch turn back.
 
         # Check if any opponent's move attacks the king's row.
         row = kingPos[0]
         for r, _ in oppM:
             if r == row:
-                return False  # Cannot castle if king is in check or passes through check.
+                return (
+                    False  # Cannot castle if king is in check or passes through check.
+                )
         return True  # Castling is possible.
 
     def castle(self, kingPos: tuple, rookPos: tuple) -> None:
@@ -179,84 +267,24 @@ class GameState:
             # Check if the last move was a pawn moving two squares forward.
             if (
                 moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
-                and abs(moveObj.moverStartSq[0] - moveObj.moverEndSq[0]) == 2  # Moved two squares.
+                and abs(moveObj.moverStartSq[0] - moveObj.moverEndSq[0])
+                == 2  # Moved two squares.
                 and move[1][1] == moveObj.moverEndSq[1]  # Same column as the pawn.
-                and move[0][0] == moveObj.moverEndSq[0]  # Capturing pawn is next to the moved pawn.
+                and move[0][0]
+                == moveObj.moverEndSq[0]  # Capturing pawn is next to the moved pawn.
                 and (
-                    (self.isWhiteTurn and move[1][0] - moveObj.moverEndSq[0] == -1)  # White pawn moving up.
+                    (
+                        self.isWhiteTurn and move[1][0] - moveObj.moverEndSq[0] == -1
+                    )  # White pawn moving up.
                     or (
-                        not self.isWhiteTurn and move[1][0] - moveObj.moverEndSq[0] == 1  # Black pawn moving down.
+                        not self.isWhiteTurn
+                        and move[1][0] - moveObj.moverEndSq[0]
+                        == 1  # Black pawn moving down.
                     )
                 )
             ):
                 return True  # En passant is possible.
         return False  # Not an en passant move.
-
-    def genValidMoves(self, board: list) -> list:
-        """
-        Generates all valid moves for the current player, accounting for checks and checkmates.
-
-        :Parameters:
-        - board: list
-            The current board state.
-
-        :Returns:
-        - list: A list of valid moves.
-        """
-        # Generate all possible moves (not necessarily valid).
-        self.posMoves = self.genPossibleMoves(board)
-        # Get the position of the current player's king.
-        self.kingPos = self.posOfPiece("wK" if self.isWhiteTurn else "bK")[0]
-        # Check if the king is in check.
-        numOfChecks = self.checkAroundKing(self.kingPos)
-        if self.posMoves == [] and numOfChecks:
-            # If there are no valid moves and the king is in check, it's checkmate.
-            print("Checkmate!", ("Black wins!" if self.isWhiteTurn else "White wins!"))
-        elif self.posMoves == []:
-            # If there are no valid moves but the king is not in check, it's stalemate.
-            print("Stalemate!")
-        return self.posMoves
-
-
-    def genPossibleMoves(self, board: list) -> list:
-        """
-        Generates all possible moves for the current player, without considering checks.
-
-        :Parameters:
-        - board: list
-            The current state of the board.
-
-        :Returns:
-        - list: A list of all possible moves for the current player.
-        """
-        possibleMoves = []
-        colors = ["w", "b"]  # Define colors for white and black pieces.
-        turn = 0 if self.isWhiteTurn else 1  # Determine whose turn it is.
-        for row in range(len(board)):
-            for col in range(len(board[0])):
-                piece = board[row][col]
-                if piece[0] == colors[turn]:
-                    # Generate moves based on the piece type.
-                    if piece[1] == "P":
-                        self.pawnMoves(
-                            row,
-                            col,
-                            piece,
-                            board,
-                            possibleMoves,
-                            colors[1 - turn],  # Opponent's color.
-                        )
-                    elif piece[1] == "N":
-                        self.knightMoves(row, col, piece, board, possibleMoves)
-                    elif piece[1] == "R":
-                        self.rookMoves(row, col, piece, board, possibleMoves)
-                    elif piece[1] == "B":
-                        self.bishopMoves(row, col, piece, board, possibleMoves)
-                    elif piece[1] == "Q":
-                        self.queenMoves(row, col, piece, board, possibleMoves)
-                    elif piece[1] == "K":
-                        self.kingMoves(row, col, piece, board, possibleMoves)
-        return possibleMoves
 
     def pawnMoves(
         self,
@@ -289,8 +317,10 @@ class GameState:
             moveObj = self.moveLog[-1]  # Get the last move made.
             if (
                 moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
-                and abs(moveObj.moverEndSq[0] - moveObj.moverStartSq[0]) == 2  # Moved two squares.
-                and row == moveObj.moverEndSq[0]  # Pawn is on the same rank as the moved pawn.
+                and abs(moveObj.moverEndSq[0] - moveObj.moverStartSq[0])
+                == 2  # Moved two squares.
+                and row
+                == moveObj.moverEndSq[0]  # Pawn is on the same rank as the moved pawn.
             ):
                 if col + 1 == moveObj.moverEndSq[1]:
                     # Check for en passant capture to the right.
@@ -347,7 +377,16 @@ class GameState:
         - str: The piece to promote to ('R', 'B', 'N', or 'Q').
         """
         running = True
-        p_names = ["wR", "wB", "wN", "wQ", "bR", "bB", "bN", "bQ"]  # Possible promotion pieces.
+        p_names = [
+            "wR",
+            "wB",
+            "wN",
+            "wQ",
+            "bR",
+            "bB",
+            "bN",
+            "bQ",
+        ]  # Possible promotion pieces.
         IMAGES = {}
         color = ""
         font = p.font.SysFont("Arial", 15)  # Set the font for text display.
@@ -383,7 +422,9 @@ class GameState:
                         75,
                     ),
                 )
-                f = font.render(str(i + 1), True, (0, 0, 0))  # Render the option number.
+                f = font.render(
+                    str(i + 1), True, (0, 0, 0)
+                )  # Render the option number.
                 screen.blit(
                     f,
                     p.Rect(
@@ -422,7 +463,9 @@ class GameState:
                         75,
                     ),
                 )
-                f = font.render(str(i - 3), True, (0, 0, 0))  # Render the option number.
+                f = font.render(
+                    str(i - 3), True, (0, 0, 0)
+                )  # Render the option number.
                 screen.blit(
                     f,
                     p.Rect(
@@ -480,11 +523,11 @@ class GameState:
         # List of possible moves a knight can make.
         knight_moves = [
             (2, -1),
-            (2, 1),    # Moves two squares down, one square left/right.
+            (2, 1),  # Moves two squares down, one square left/right.
             (-2, -1),
-            (-2, 1),   # Moves two squares up, one square left/right.
+            (-2, 1),  # Moves two squares up, one square left/right.
             (1, 2),
-            (-1, 2),   # Moves one square up/down, two squares right.
+            (-1, 2),  # Moves one square up/down, two squares right.
             (1, -2),
             (-1, -2),  # Moves one square up/down, two squares left.
         ]
@@ -496,8 +539,9 @@ class GameState:
                     # Add the move if the destination is empty or contains an opponent's piece.
                     possibleMoves.append(((r, c), (row, col)))
 
-
-    def rookMoves(self, row: int, col: int, piece: str, board: list, possibleMoves: list) -> None:
+    def rookMoves(
+        self, row: int, col: int, piece: str, board: list, possibleMoves: list
+    ) -> None:
         """
         Generate all possible rook moves from the given position.
         """
@@ -518,7 +562,9 @@ class GameState:
                 else:
                     break
 
-    def bishopMoves(self, row: int, col: int, piece: str, board: list, possibleMoves: list) -> None:
+    def bishopMoves(
+        self, row: int, col: int, piece: str, board: list, possibleMoves: list
+    ) -> None:
         """
         Generate all possible bishop moves from the given position.
         """
@@ -561,7 +607,6 @@ class GameState:
         self.bishopMoves(row, col, piece, board, possibleMoves)
         self.rookMoves(row, col, piece, board, possibleMoves)
 
-
     def kingMoves(
         self, row: int, col: int, piece: str, board: list, possibleMoves: list
     ) -> None:
@@ -582,14 +627,14 @@ class GameState:
         """
         # Directions the king can move: one square in any direction.
         directions = [
-            (-1, 0),   # Up
-            (1, 0),    # Down
-            (0, -1),   # Left
-            (0, 1),    # Right
-            (-1, 1),   # Up-Right
-            (1, 1),    # Down-Right
+            (-1, 0),  # Up
+            (1, 0),  # Down
+            (0, -1),  # Left
+            (0, 1),  # Right
+            (-1, 1),  # Up-Right
+            (1, 1),  # Down-Right
             (-1, -1),  # Up-Left
-            (1, -1),   # Down-Left
+            (1, -1),  # Down-Left
         ]
         for d in directions:
             r = row + d[0]
@@ -598,7 +643,6 @@ class GameState:
                 if board[r][c][0] != piece[0]:
                     # Add the move if the destination is empty or contains an opponent's piece.
                     possibleMoves.append(((r, c), (row, col)))
-
 
     def posOfPiece(self, piece: str) -> list:
         """
@@ -619,7 +663,6 @@ class GameState:
                     pos.append((row, col))  # Add the position to the list.
         return pos
 
-
     def checkAroundKing(self, king: tuple) -> bool:
         """
         Checks for checks and pins around the king.
@@ -637,11 +680,10 @@ class GameState:
         # Possible directions to check around the king.
         kMoves = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, 1), (1, 1), (-1, -1), (1, -1))
         locOwnColor = False  # Flag to indicate if we've encountered our own piece.
-        count = 0  # Counter for the number of checks.
-
+        toDelete = []  # (index, type) # type 0 = pin, 1 = check, 2 = illegal move
         # Check for knight checks and remove illegal king moves.
-        self.checkKnightcheck(oColor, self.kingPos)
-        self.kingCantMoveWhere()
+        self.checkKnightcheck(oColor, self.kingPos, toDelete)
+        self.kingCantMoveWhere(toDelete)
 
         for move in kMoves:  # Check all directions around the king.
             for i in range(1, 8):
@@ -654,8 +696,9 @@ class GameState:
                     # Get the piece at the current position.
                     piece = self.board[r][c]
                     pColor = piece[0]  # Piece color: 'w' or 'b'.
-                    pType = piece[1]   # Piece type: 'Q', 'R', 'B', 'N', 'P', or 'K'.
-
+                    pType = piece[1]  # Piece type: 'Q', 'R', 'B', 'N', 'P', or 'K'.
+                    if pType == "_":
+                        continue
                     if pColor == currColor:
                         # If we've already encountered our own piece, stop checking this direction.
                         if locOwnColor:
@@ -665,39 +708,35 @@ class GameState:
                         if locOwnColor:
                             # An opponent's piece is behind our own piece, which might be pinned.
                             print("Pin: ", (r, c), "{", move, "} ", piece)
-                            self.pinned((r, c), locOwnColor, move, piece[1])
+                            self.pinned((r, c), locOwnColor, move, piece[1], toDelete)
                             locOwnColor = False
                             break
                         # Check for checks from opponent pieces.
                         elif (c_off == 0 or r_off == 0) and (pType in "RQ"):
                             # Straight line checks (rook or queen).
                             print("Rem: ", (r, c), "{", move, "} ", piece[1])
-                            self.remMoves(r, c, True)
-                            count += 1
+                            self.remMoves(r, c, True, toDelete, king)
                         elif (c_off != 0 and r_off != 0) and (pType in "BQ"):
                             # Diagonal checks (bishop or queen).
                             print("Rem: ", (r, c), "{", move, "} ", piece[1])
-                            self.remMoves(r, c, False)
-                            count += 1
+                            self.remMoves(r, c, False, toDelete, king)
                         elif (
                             (currColor == "w" and r_off == -1 and abs(c_off) == 1)
                             or (currColor == "b" and r_off == 1 and abs(c_off) == 1)
                         ) and (pType == "P"):
                             # Check for pawn checks.
                             print("Rem: ", (r, c), "{", move, "} ", piece[1])
-                            self.remMoves(r, c, False)
-                            count += 1
+                            self.remMoves(r, c, False, toDelete, king)
                         else:
                             break
                 else:
                     break
             locOwnColor = False  # Reset the flag for the next direction.
-        if count > 0:
-            self.check = True  # Mark that the king is in check.
-        return count > 0
+        return toDelete
 
-
-    def remMoves(self, r: int, c: int, vh: bool) -> None:
+    def remMoves(
+        self, r: int, c: int, vh: bool, toDelete: list, kingPos: tuple
+    ) -> None:
         """
         Removes illegal moves due to checks, ensuring the king is not left in check.
 
@@ -710,62 +749,53 @@ class GameState:
             True if the threat is vertical/horizontal, False if diagonal.
         """
         if vh:  # If the threat is vertical or horizontal.
-            d_row = self.kingPos[0] - r
-            d_col = self.kingPos[1] - c
+            d_row = kingPos[0] - r
+            d_col = kingPos[1] - c
             if d_row == 0:
                 # Threat is horizontal.
                 for i in range(len(self.posMoves) - 1, -1, -1):
                     m = self.posMoves[i]
-                    if m[1] == self.kingPos and (
-                        (d_col > 0 and (m[0][0] == r and self.kingPos[1] > m[0][1] > c))
-                        or (
-                            d_col < 0
-                            and (m[0][0] == r and self.kingPos[1] < m[0][1] < c)
-                        )
+                    if m[1] == kingPos and (
+                        (d_col > 0 and (m[0][0] == r and kingPos[1] > m[0][1] > c))
+                        or (d_col < 0 and (m[0][0] == r and kingPos[1] < m[0][1] < c))
                     ):
                         # Remove moves that don't block or capture the checking piece.
-                        self.posMoves.pop(i)
-                    elif m[1] != self.kingPos and (
-                        (
-                            d_col > 0
-                            and not (m[0][0] == r and self.kingPos[1] > m[0][1] >= c)
-                        )
+                        toDelete.append((i, 1))
+                    elif m[1] != kingPos and (
+                        (d_col > 0 and not (m[0][0] == r and kingPos[1] > m[0][1] >= c))
                         or (
                             d_col < 0
-                            and not (m[0][0] == r and self.kingPos[1] < m[0][1] <= c)
+                            and not (m[0][0] == r and kingPos[1] < m[0][1] <= c)
                         )
                     ):
-                        self.posMoves.pop(i)
+                        toDelete.append((i, 1))
             if d_col == 0:
                 # Threat is vertical.
                 for i in range(len(self.posMoves) - 1, -1, -1):
                     m = self.posMoves[i]
-                    if m[1] == self.kingPos and (
-                        (d_row > 0 and (m[0][1] == c and self.kingPos[0] > m[0][0] > r))
-                        or (d_row < 0 and (m[0][1] == c and self.kingPos[0] < m[0][0] < r))
+                    if m[1] == kingPos and (
+                        (d_row > 0 and (m[0][1] == c and kingPos[0] > m[0][0] > r))
+                        or (d_row < 0 and (m[0][1] == c and kingPos[0] < m[0][0] < r))
                     ):
-                        self.posMoves.pop(i)
-                    elif m[1] != self.kingPos and (
-                        (
-                            d_row > 0
-                            and not (m[0][1] == c and self.kingPos[0] > m[0][0] >= r)
-                        )
+                        toDelete.append((i, 1))
+                    elif m[1] != kingPos and (
+                        (d_row > 0 and not (m[0][1] == c and kingPos[0] > m[0][0] >= r))
                         or (
                             d_row < 0
-                            and not (m[0][1] == c and self.kingPos[0] < m[0][0] <= r)
+                            and not (m[0][1] == c and kingPos[0] < m[0][0] <= r)
                         )
                     ):
-                        self.posMoves.pop(i)
+                        toDelete.append((i, 1))
         else:
             # Diagonal threat.
-            d_row = self.kingPos[0] - r
-            d_col = self.kingPos[1] - c
+            d_row = kingPos[0] - r
+            d_col = kingPos[1] - c
             d_row = d_row / abs(d_row)
             d_col = d_col / abs(d_col)
             # Build list of positions between the checking piece and the king.
             places = [(r, c), (r + d_row, c + d_col)]
             counter = 2
-            while places[-1] != self.kingPos:
+            while places[-1] != kingPos:
                 places.append((r + d_row * counter, c + d_col * counter))
                 counter += 1
             for i in range(len(self.posMoves) - 1, -1, -1):
@@ -773,12 +803,11 @@ class GameState:
                     if self.posMoves[i][0] == (r, c):
                         continue  # Allow capturing the checking piece.
                     elif self.posMoves[i][0] in places:
-                        self.posMoves.pop(i)
+                        toDelete.append((i, 1))
                 elif self.posMoves[i][0] not in places:
-                    self.posMoves.pop(i)
+                    toDelete.append((i, 1))
 
-
-    def kingCantMoveWhere(self) -> None:
+    def kingCantMoveWhere(self, toDelete: list) -> None:
         """
         Determines squares where the king cannot move due to threats.
         """
@@ -795,7 +824,7 @@ class GameState:
                 moves = self.genPossibleMoves(b)
                 # If the destination square is attacked, remove the move.
                 if (piece[0][0], piece[0][1]) in [x[0] for x in moves]:
-                    self.posMoves.pop(e)
+                    toDelete.append((e, 3))
                 # Revert the simulated move.
                 b[piece[0][0]][piece[0][1]] = self.board[piece[0][0]][piece[0][1]]
                 b[self.kingPos[0]][self.kingPos[1]] = self.board[self.kingPos[0]][
@@ -803,12 +832,11 @@ class GameState:
                 ]
                 self.isWhiteTurn = not self.isWhiteTurn
 
-
     def pinned(
-        self, pinner: tuple, pinned: tuple, moveDir: tuple, piece: str
+        self, pinner: tuple, pinned: tuple, moveDir: tuple, piece: str, toDelete: list
     ) -> None:
         """
-        Handles pinning of pieces. Removes moves that would expose the king to check if the piece is pinned.
+        Handles pinning of pieces. Removes moves that would expose the king to check if the piece is pinned.`
 
         :Parameters:
         - pinner: tuple
@@ -831,7 +859,7 @@ class GameState:
                         movePlace = self.posMoves[i][0]
                         if movePiece[1] - movePlace[1] != 0:
                             # Remove moves that move the pinned piece off the pinning line.
-                            self.posMoves.pop(i)
+                            toDelete.append((i, 0))
             elif m_r == 0 and (piece == "B" or piece == "Q"):
                 print("Pin: B or Q")
                 for i in range(len(self.posMoves) - 1, -1, -1):
@@ -839,7 +867,7 @@ class GameState:
                     if movePiece == pinned:
                         movePlace = self.posMoves[i][0]
                         if movePiece[0] - movePlace[0] != 0 and movePlace != pinned:
-                            self.posMoves.pop(i)
+                            toDelete.append((i, 0))
         elif piece == "Q" or piece == "B":
             print("Pin: B or Q outside elif")
             for i in range(len(self.posMoves) - 1, -1, -1):
@@ -848,15 +876,16 @@ class GameState:
                     movePlace = self.posMoves[i][0]
                     # Calculate the direction of the move.
                     pieceDir = (
-                        (movePiece[0] - movePlace[0]) / (abs(movePiece[0] - movePlace[0]) or 1),
-                        (movePiece[1] - movePlace[1]) / (abs(movePiece[1] - movePlace[1]) or 1),
+                        (movePiece[0] - movePlace[0])
+                        / (abs(movePiece[0] - movePlace[0]) or 1),
+                        (movePiece[1] - movePlace[1])
+                        / (abs(movePiece[1] - movePlace[1]) or 1),
                     )
                     if pieceDir != moveDir and movePlace != pinner:
                         # Remove moves that move the pinned piece off the pinning line.
-                        self.posMoves.pop(i)
+                        toDelete.append((i, 0))
 
-
-    def checkKnightcheck(self, oColor: str, kingPos: tuple) -> None:
+    def checkKnightcheck(self, oColor: str, kingPos: tuple, toDelete: list) -> None:
         """
         Checks if the king is under attack by a knight and removes illegal moves accordingly.
 
@@ -881,7 +910,7 @@ class GameState:
             for i in range(len(self.posMoves) - 1, -1, -1):
                 p = self.posMoves[i]
                 if p[0] != KnIsPresent and self.board[p[1][0]][p[1][1]][1] != "K":
-                    self.posMoves.pop(i)
+                    toDelete.append((i, 0))
 
 
 class Move:
@@ -948,6 +977,7 @@ class Move:
         self.isPieceCaptured: bool = True if self.pieceOther != "__" else False
         self.promotedTo: str = promotedTo
         self.type: int = typeOfMove
+        self.checkOrMate = ""
 
     def __str__(self) -> str:
         """
@@ -963,18 +993,30 @@ class Move:
             - "e7xf8=Q" for pawn promotion with capture.
         """
         if self.type == -1:
-            return "O-O-O"
+            return "O-O-O" + self.checkOrMate
         elif self.type == 1:
-            return "O-O"
+            return "O-O" + self.checkOrMate
         elif self.type == 3:
             if self.isPieceCaptured:
-                return f"{self.get_square(self.moverStartSq)}x{self.get_square(self.moverEndSq)}={self.promotedTo}"
+                return (
+                    f"{self.get_square(self.moverStartSq)}x{self.get_square(self.moverEndSq)}={self.promotedTo}"
+                    + self.checkOrMate
+                )
             else:
-                return f"{self.get_square(self.moverStartSq)}={self.promotedTo}"
+                return (
+                    f"{self.get_square(self.moverStartSq)}={self.promotedTo}"
+                    + self.checkOrMate
+                )
         elif self.type == 2 or self.isPieceCaptured:
-            return f"{self.get_square(self.moverStartSq)}x{self.get_square(self.moverEndSq)}"
+            return (
+                f"{self.get_square(self.moverStartSq)}x{self.get_square(self.moverEndSq)}"
+                + self.checkOrMate
+            )
         else:
-            return f"{self.get_square(self.moverStartSq)}{self.get_square(self.moverEndSq)}"
+            return (
+                f"{self.get_square(self.moverStartSq)}{self.get_square(self.moverEndSq)}"
+                + self.checkOrMate
+            )
 
     @staticmethod
     def get_square(sq: tuple) -> str:

@@ -124,7 +124,9 @@ def draw_board(
         overlay = p.Surface(
             (SQ_EACH_SIZE, SQ_EACH_SIZE), p.SRCALPHA
         )  # Use SRCALPHA for transparency.
-        overlay.fill(POSSIBLE_MOVES)  # Add an alpha value (0-255), 128 is semi-transparent.
+        overlay.fill(
+            POSSIBLE_MOVES
+        )  # Add an alpha value (0-255), 128 is semi-transparent.
         # Draw the transparent rectangle on the screen.
         screen.blit(overlay, (c * SQ_EACH_SIZE, r * SQ_EACH_SIZE))
 
@@ -250,6 +252,7 @@ def eventHandler(
         Possible moves for the selected piece.
     """
     redraw = False
+    genMoves = False
     for event in p.event.get():
         if event.type == p.QUIT:
             p.quit()
@@ -262,19 +265,21 @@ def eventHandler(
         elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
             # Handle left-click for moving pieces.
             possibleMoves.clear()
-            handleSquareSelection(
+            genMoves  = handleSquareSelection(
                 *p.mouse.get_pos(), userClicks, toHighlight, screen, possibleMoves
             )
-            toHighlight.clear()
             redraw = True
         elif event.type == p.KEYDOWN and event.key == p.K_LEFT:
             # Undo the last move when the left arrow key is pressed.
+            redraw = handleLeftButtonDown(userClicks)
+            genMoves = redraw
             possibleMoves.clear()
-            handleLeftButtonDown(userClicks)
             toHighlight.clear()
             redraw = True
+            genMoves = True
     if redraw:
         drawGameState(screen, GameState, userClicks, toHighlight, possibleMoves)
+    if genMoves:
         generateValidMoves()
 
 
@@ -296,7 +301,7 @@ def findSquare(x: int, y: int) -> tuple:
     return (x, y)
 
 
-def handleLeftButtonDown(userClicks: list) -> None:
+def handleLeftButtonDown(userClicks: list) -> bool:
     """
     Handles the event when the left arrow key is pressed to undo the last move.
 
@@ -304,8 +309,8 @@ def handleLeftButtonDown(userClicks: list) -> None:
     - userClicks: list
         The list of user clicks (move history).
     """
-    GameState.undoMove()
     userClicks.clear()  # Clear the move list.
+    return GameState.undoMove()
 
 
 def squareHighlight(x: int, y: int, toHighlight: list) -> None:
@@ -335,7 +340,7 @@ def handleSquareSelection(
     toHighlight: list,
     screen: p.Surface,
     possibleMoves: list,
-) -> None:
+) -> bool:
     """
     Handles the selection of squares when the user clicks on the board.
 
@@ -353,9 +358,10 @@ def handleSquareSelection(
     - possibleMoves: list
         Possible moves for the selected piece.
     """
+    redraw = False
     # Check if the click is within bounds.
     if not (mouseX < WIDTH and mouseY < HEIGHT):
-        return  # Out of bounds.
+        return redraw  # Out of bounds.
     # Get the square coordinates.
     squareX, squareY = findSquare(mouseX, mouseY)
     if len(userClicks) == 1:
@@ -363,6 +369,7 @@ def handleSquareSelection(
         # Check for castling move.
         if castleChecks(userClicks):
             castle(userClicks)
+            redraw = True
         elif (userClicks[1], userClicks[0]) in validMoves:
             if pawnChecks(userClicks):
                 handlePawnPromotion(userClicks, screen, toHighlight, possibleMoves)
@@ -370,6 +377,7 @@ def handleSquareSelection(
                 makeEnPassant(userClicks)
             else:
                 handleMove(userClicks)
+            redraw = True
         elif userClicks[0] == userClicks[1]:
             userClicks.clear()
         else:
@@ -384,7 +392,7 @@ def handleSquareSelection(
     else:
         userClicks.append((squareY, squareX))
         highlightPosMoves(userClicks, screen, possibleMoves)
-
+    return redraw
 
 def highlightPosMoves(piece: list, screen: p.Surface, possibleMoves: list) -> None:
     """
