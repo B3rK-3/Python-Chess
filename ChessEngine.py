@@ -1,5 +1,6 @@
 import pygame as p
 from typing import List
+import copy
 
 
 class GameState:
@@ -21,18 +22,23 @@ class GameState:
         # The notation is as follows: 'bR' = black rook, 'wR' = white rook, '__' = empty square, etc.
         self.board = [
             ["bR", "__", "__", "__", "bK", "__", "__", "bR"],
-            ["bP", "bP", "wP", "__", "bP", "bP", "wP", "bP"],
+            ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["__", "__", "__", "__", "__", "__", "bR", "__"],
-            ["__", "__", "__", "__", "__", "__", "bQ", "__"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["wP", "wP", "wP", "wP", "__", "__", "__", "__"],
-            ["wR", "__", "__", "__", "__", "__", "__", "wK"],
+            ["__", "__", "__", "__", "__", "__", "__", "__"],
+            ["__", "__", "__", "__", "__", "__", "__", "__"],
+            ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
+            ["wR", "__", "__", "__", "wK", "__", "__", "wR"],
         ]
         # Indicates whose turn it is; True if it's white's turn, False if black's.
         self.isWhiteTurn = True
         # A log to keep track of all moves made in the game.
-        self.moveLog: List["Move"] = []
+        self.moveLog: list["Move"] = []
+        self.castleRightsLog: list[
+            tuple[list[bool]]
+        ] = []  # castle rights (whiteCastleRights, blackCastleRights)
+        self.whiteCastleRights = [True, True]  # Queen Side, King Side
+        self.blackCastleRights = [True, True]  # Queen Side, King Side
 
     def genValidMoves(self, board: list) -> list:
         """
@@ -148,7 +154,43 @@ class GameState:
             if type == 1:
                 moveObj.checkOrMate = "+"
                 break
+        # Log the stuff
         self.moveLog.append(moveObj)
+        print("Before removing:", self.whiteCastleRights, self.blackCastleRights)
+
+        # 2) Append a deep copy to preserve current state
+        self.castleRightsLog.append(
+            (
+                copy.deepcopy(self.whiteCastleRights),
+                copy.deepcopy(self.blackCastleRights),
+            )
+        )
+
+        # 3) Now modify the rights
+        self.removeCastleRights(moveObj)
+
+        # 4) Print them again
+        print("After removing:", self.whiteCastleRights, self.blackCastleRights)
+
+    def removeCastleRights(self, moveObj: "Move"):
+        # removing castling rights logic
+        if moveObj.pieceMoved == "wK":
+            self.whiteCastleRights = [False, False]
+        elif moveObj.pieceMoved == "bK":
+            self.blackCastleRights = [False, False]
+        elif moveObj.moverStartSq == (0, 0) or moveObj.otherStartSq == (0, 0):
+            self.blackCastleRights[0] = False
+        elif moveObj.moverStartSq == (0, 7) or moveObj.otherStartSq == (0, 7):
+            self.blackCastleRights[1] = False
+        elif moveObj.moverStartSq == (7, 0) or moveObj.otherStartSq == (7, 0):
+            self.whiteCastleRights[0] = False
+        elif moveObj.moverStartSq == (7, 7) or moveObj.otherStartSq == (7, 7):
+            self.whiteCastleRights[1] = False
+
+    def restoreCastleRights(self, moveObj: "Move"):
+        # restore the rights by popping the most recent rights in the log
+        print(self.castleRightsLog)
+        self.whiteCastleRights, self.blackCastleRights = self.castleRightsLog.pop()
 
     def undoMove(self) -> None:
         """
@@ -173,6 +215,9 @@ class GameState:
             # Switch turn back to the previous player.
             self.isWhiteTurn = not self.isWhiteTurn
 
+            # need to restore castle permissions
+            self.restoreCastleRights(moveObj)
+
     def canCastle(self, kingPos: tuple, rookPos: tuple) -> bool:
         """
         Determines if castling is possible for the given king and rook positions.
@@ -187,30 +232,20 @@ class GameState:
         - bool: True if castling is possible, False otherwise.
         """
         # Generate possible castling moves.
-
-        # Initialize a list to keep track of the starting squares of all moves made.
-        logs = []  # Accounts for moves like en passant, which are tuples in self.moveLog.
-        for moveObj in self.moveLog:
-            logs.append(moveObj.moverStartSq)
         if self.isWhiteTurn:
-            # Set initial positions for white king and rooks.
-            king = (7, 4)
-            rooks = {(7, 0), (7, 7)}
+            if rookPos not in ((7, 0), (7, 7)):
+                return False
+            elif rookPos == (7, 0) and not self.whiteCastleRights[0]:
+                return False
+            elif rookPos == (7, 7) and not self.whiteCastleRights[1]:
+                return False
         else:
-            # Set initial positions for black king and rooks.
-            king = (0, 4)
-            rooks = {(0, 0), (0, 7)}
-
-        # Check if the king or the rook have moved from their initial positions.
-        if kingPos != king or rookPos not in rooks:
-            return False  # Cannot castle if king or rook have moved.
-        for log in logs:
-            if king == log:
-                return False  # King has moved before.
-            elif log in rooks:
-                rooks.remove(log)  # Remove the rook that has moved.
-        if not rooks:
-            return False  # Both rooks have moved; cannot castle.
+            if rookPos not in ((0, 0), (0, 7)):
+                return False
+            elif rookPos == (0, 0) and not self.blackCastleRights[0]:
+                return False
+            elif rookPos == (0, 7) and not self.blackCastleRights[1]:
+                return False
         # Generate opponent's moves to check for threats along the castling path.
         self.isWhiteTurn = not self.isWhiteTurn  # Switch turn to opponent.
         oppM = [
@@ -239,6 +274,7 @@ class GameState:
         """
         if rookPos[1] == 7:  # Short Castle
             # Create a move object for short castling.
+
             moveObj = Move(
                 (kingPos, (kingPos[0], 6)), (rookPos, (rookPos[0], 5)), self.board, 1
             )
@@ -912,6 +948,56 @@ class GameState:
                 if p[0] != KnIsPresent and self.board[p[1][0]][p[1][1]][1] != "K":
                     toDelete.append((i, 0))
 
+    def pawnChecks(self, userClicks: list) -> bool:
+        """
+        Checks if a pawn promotion is possible.
+
+        :Parameters:
+        - userClicks: list
+            The list of user clicks (current move).
+
+        :Returns:
+        - bool: True if pawn promotion is possible, False otherwise.
+        """
+        return self.board[userClicks[0][0]][userClicks[0][1]][1] == "P" and (
+            (userClicks[1][0] == 0) or (userClicks[1][0] == 7)
+        )
+
+    def castleChecks(self, userClicks: list) -> bool:
+        """
+        Checks if castling is possible with the selected pieces.
+
+        :Parameters:
+        - userClicks: list
+            The list of user clicks (current move).
+
+        :Returns:
+        - bool: True if castling is possible, False otherwise.
+        """
+        return (
+            self.board[userClicks[0][0]][userClicks[0][1]][1] == "K"
+            and self.board[userClicks[1][0]][userClicks[1][1]][1] == "R"
+            and self.canCastle(userClicks[0], userClicks[1])
+        )
+
+    def makeEnPassant(self, userClicks: list) -> None:
+        """
+        Executes an en passant move.
+
+        :Parameters:
+        - userClicks: list
+            The list of user clicks (current move).
+        """
+        moveObj = self.moveLog[-1]
+        # Create the en passant move.
+        moveObj = Move(
+            userClicks,  # Piece moved.
+            (moveObj.moverEndSq, userClicks[1]),  # Piece captured.
+            self.board,
+            2,  # Type of move (en passant).
+        )
+        self.makeMove(moveObj)
+
 
 class Move:
     """
@@ -1033,3 +1119,48 @@ class Move:
         rank = Move.ROWS_TO_RANKS[sq[0]]  # Convert row index to rank number.
         file = Move.COLS_TO_FILES[sq[1]]  # Convert column index to file letter.
         return f"{file}{rank}"
+
+
+class PGN:
+    @staticmethod
+    def boardToPGN(board: list[str]):
+        pgn = ""
+        for row in board:
+            skipAmount = 0
+            for column in row:
+                if column == "__":
+                    skipAmount += 1
+                else:
+                    if skipAmount > 0:
+                        pgn += str(skipAmount)
+                        skipAmount = 0
+                    pgn += column[1].lower() if column[0] == "b" else column[1]
+            if skipAmount > 0:
+                pgn += str(skipAmount)
+            pgn += "/"
+        return pgn[:-1]
+
+    @staticmethod
+    def PGNtoBoard(pgn: str):
+        board = [["__"] * 8 for _ in range(8)]
+        i = 0
+        row = 0
+        while row < 8:
+            col = 0
+            while col < 8:
+                piece = pgn[i]
+                try:
+                    skipAmount = int(piece)
+                    print(skipAmount)
+                    col += skipAmount - 1
+                except ValueError:
+                    if piece != "/":
+                        board[row][col] = (
+                            "w" if piece.upper() == piece else "b"
+                        ) + piece.upper()
+                    else:
+                        col -= 1
+                i += 1
+                col += 1
+            row += 1
+        return board
