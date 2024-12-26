@@ -6,6 +6,8 @@ import pygame as p
 import pygame.font
 import ChessEngine
 from interface import UI
+import inspect
+import sys
 
 # Set up constants for the game dimensions and settings.
 WIDTH: int = 600  # The width of the game window.
@@ -15,7 +17,6 @@ MAX_FPS: int = 15  # Maximum frames per second (controls the game speed).
 # Global Game Values
 CLOCK: p.time.Clock = None  # Clock object to manage game updates.
 GameState: ChessEngine.GameState = ChessEngine.GameState()  # Initialize the game state.
-validMoves: list = None  # List to store valid moves.
 
 
 def main() -> None:
@@ -25,11 +26,11 @@ def main() -> None:
     ui = UI(WIDTH, HEIGHT)
     screen, CLOCK = ui.setPyGameValues()
     ui.loadImages()  # Load images once to save memory.
-    generateValidMoves()
     userClicks: list = []  # A list to store the user clicks.
     toHighlight: list = []  # A list to keep track of squares to highlight.
     possibleMoves: list = []  # A list of possible coordinates the selected piece can move to.
     drawGameState(ui, screen, GameState, userClicks, toHighlight, possibleMoves)
+
     p.display.flip()
     while True:
         eventHandler(ui, toHighlight, userClicks, screen, possibleMoves)
@@ -64,17 +65,6 @@ def drawGameState(
     ui.draw_pieces(screen, gs.board)  # Draw the chess pieces on the board.
     ui.draw_places(screen)  # Draw the ranks and files labels.
 
-
-def generateValidMoves() -> None:
-    """
-    Generates all valid moves for the current board state and updates the global variable.
-    """
-    global validMoves
-    validMoves = GameState.genValidMoves(
-        GameState.board
-    )  # Generate all valid moves for the current board state.
-
-
 def eventHandler(
     ui: "UI",
     toHighlight: list,
@@ -96,7 +86,6 @@ def eventHandler(
         Possible moves for the selected piece.
     """
     redraw = False
-    genMoves = False
     for event in p.event.get():
         if event.type == p.QUIT:
             p.quit()
@@ -109,22 +98,18 @@ def eventHandler(
         elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
             # Handle left-click for moving pieces.
             possibleMoves.clear()
-            genMoves = handleSquareSelection(
+            handleSquareSelection(
                 ui, *p.mouse.get_pos(), userClicks, toHighlight, screen, possibleMoves
             )
             redraw = True
         elif event.type == p.KEYDOWN and event.key == p.K_LEFT:
             # Undo the last move when the left arrow key is pressed.
-            redraw = handleLeftButtonDown(userClicks)
-            genMoves = redraw
+            handleLeftButtonDown(userClicks)
             possibleMoves.clear()
             toHighlight.clear()
             redraw = True
-            genMoves = True
     if redraw:
         drawGameState(ui, screen, GameState, userClicks, toHighlight, possibleMoves)
-    if genMoves:
-        generateValidMoves()
 
 
 def handleLeftButtonDown(userClicks: list) -> bool:
@@ -167,7 +152,7 @@ def handleSquareSelection(
     toHighlight: list,
     screen: p.Surface,
     possibleMoves: list,
-) -> bool:
+) -> None:
     """
     Handles the selection of squares when the user clicks on the board.
 
@@ -185,10 +170,9 @@ def handleSquareSelection(
     - possibleMoves: list
         Possible moves for the selected piece.
     """
-    redraw = False
     # Check if the click is within bounds.
     if not (mouseX < WIDTH and mouseY < HEIGHT):
-        return redraw  # Out of bounds.
+        return  # Out of bounds.
     # Get the square coordinates.
     squareX, squareY = ui.findSquare(mouseX, mouseY)
     if len(userClicks) == 1:
@@ -197,15 +181,13 @@ def handleSquareSelection(
         print(userClicks)
         if GameState.castleChecks(userClicks):
             GameState.castle(userClicks[0], userClicks[1])
-            redraw = True
-        elif (userClicks[1], userClicks[0]) in validMoves:
+        elif (userClicks[1], userClicks[0]) in GameState.posMoves:
             if pawnChecks(userClicks):
-                handlePawnPromotion(userClicks, screen, toHighlight, possibleMoves)
+                handlePawnPromotion(ui, userClicks, screen, toHighlight, possibleMoves)
             elif enPassantChecks(userClicks):
                 GameState.makeEnPassant(userClicks)
             else:
                 handleMove(userClicks)
-            redraw = True
         elif userClicks[0] == userClicks[1]:
             userClicks.clear()
         else:
@@ -220,7 +202,6 @@ def handleSquareSelection(
     else:
         userClicks.append((squareY, squareX))
         highlightPosMoves(userClicks, screen, possibleMoves)
-    return redraw
 
 
 def highlightPosMoves(piece: list, screen: p.Surface, possibleMoves: list) -> None:
@@ -236,7 +217,7 @@ def highlightPosMoves(piece: list, screen: p.Surface, possibleMoves: list) -> No
         Possible moves for the selected piece.
     """
     piece = piece[0]
-    for toP, fromP in validMoves:
+    for toP, fromP in GameState.posMoves:
         if piece == fromP:
             possibleMoves.append(toP)
 
@@ -286,7 +267,11 @@ def handleMove(userClicks: list) -> None:
 
 
 def handlePawnPromotion(
-    userClicks: list, screen: p.Surface, toHighlight: list, possibleMoves: list
+    ui: "UI",
+    userClicks: list,
+    screen: p.Surface,
+    toHighlight: list,
+    possibleMoves: list,
 ) -> None:
     """
     Handles pawn promotion when a pawn reaches the opposite end of the board.
@@ -302,7 +287,7 @@ def handlePawnPromotion(
         Possible moves for the selected piece.
     """
     # Redraw the game state to update the display before promotion.
-    drawGameState(screen, GameState, userClicks, toHighlight, possibleMoves)
+    drawGameState(ui, screen, GameState, userClicks, toHighlight, possibleMoves)
     p.display.flip()
     # Prompt the player for the piece to promote to.
     piece = GameState.pawnPromotion(
@@ -317,6 +302,20 @@ def handlePawnPromotion(
         piece,
     )
     GameState.makeMove(move)
+
+
+async def terminateProgram(*args):
+    global stockfish
+    caller = inspect.stack()[1]
+    if stockfish:
+        stockfish.terminate()
+        await stockfish.wait()
+    print("\nProgram Termination --")
+    for arg in args:
+        print("Reason:", arg)
+    sys.exit(
+        f"Terminated at file {caller.filename} in function {caller.function} at line {caller.lineno}"
+    )
 
 
 if __name__ == "__main__":
