@@ -17,9 +17,7 @@ class UI:
         self.SQ_EACH_SIZE: int = (
             height // SIZE
         )  # The size of each square on the chessboard.
-        self.IMAGES: dict[
-            str, p.Surface
-        ] = {}  # A dictionary to store images of the chess pieces.
+        self.IMAGES: dict = {}  # A dictionary to store images of the chess pieces.
         self.whiteFirst = whiteOnBottom
 
     def loadImages(self) -> None:
@@ -44,9 +42,7 @@ class UI:
         for piece in p_names:
             # Load and scale the image for each piece, then store it in the IMAGES dictionary.
             self.IMAGES[piece] = p.transform.scale(
-                p.image.load(
-                    f"./img/{(piece if self.whiteFirst else ("b" if piece[0] == "w" else "w") + piece[1])}.png"
-                ),
+                p.image.load(f"./img/{piece}.png"),
                 (self.SQ_EACH_SIZE, self.SQ_EACH_SIZE),
             )
 
@@ -56,7 +52,7 @@ class UI:
         """
         Draws the chessboard with highlighted squares.
 
-        :Parameters:
+        #Parameters:
         - screen: p.Surface
             The game window where everything is drawn.
         - draw: list
@@ -133,7 +129,7 @@ class UI:
             # Draw the transparent rectangle on the screen.
             screen.blit(overlay, (c * self.SQ_EACH_SIZE, r * self.SQ_EACH_SIZE))
 
-    def draw_places(self, screen: p.Surface, flipped: bool = False) -> None:
+    def draw_places(self, screen: p.Surface) -> None:
         """
         Draws the rank (numbers) and file (letters) labels on the board.
 
@@ -148,28 +144,22 @@ class UI:
 
         for i in range(1, len(letters) + 1):
             # Draw file labels at the bottom of the board.
-            f = font.render(
-                letters[i - 1], True, colors[(1 - white if flipped else white)]
-            )
+            f = font.render(letters[i - 1], True, colors[white])
             screen.blit(
                 f,
                 (
                     64 * i + i * 11 - 10 + (3 if letters[i - 1] == "f" else 0),
-                    self.height - 17 - (3 if letters[i - 1] == "g" else 0),
+                    self.height
+                    - 15
+                    - (3 if letters[i - 1] == "g" or letters[i - 1] == "h" else 0),
                 ),
             )
             # Draw rank labels on the left side of the board.
-            f = font.render(
-                str((9 - i if flipped else i)),
-                True,
-                colors[(1 - white if flipped else white)],
-            )
+            f = font.render(str(i), True, colors[(white if not white else 1)])
             screen.blit(f, (1, 75 * (9 - i) - 75))
             white = 1 - white  # Alternate the color.
 
-    def draw_pieces(
-        self, screen: p.Surface, board: list, flipped: bool = False
-    ) -> None:
+    def draw_pieces(self, screen: p.Surface, board: list) -> None:
         """
         Draws the chess pieces on the board.
 
@@ -185,9 +175,7 @@ class UI:
                 if pc != "__":  # If the square is not empty.
                     # Draw the piece image on the board.
                     screen.blit(
-                        self.IMAGES[pc]
-                        if not flipped
-                        else p.transform.flip(self.IMAGES[pc], False, True),
+                        self.IMAGES[pc],
                         p.Rect(
                             c * self.SQ_EACH_SIZE,
                             r * self.SQ_EACH_SIZE,
@@ -212,7 +200,7 @@ class UI:
             CLOCK,
         )  # Set up the game window.
 
-    def findSquare(self, x: int, y: int, flipped: bool = False) -> tuple:
+    def findSquare(self, x: int, y: int) -> tuple:
         """
         Converts pixel coordinates to board coordinates.
 
@@ -226,6 +214,5 @@ class UI:
         - tuple: The (column, row) on the board.
         """
         x = x // self.SQ_EACH_SIZE
-        y = ((600 - y) if flipped else y) // self.SQ_EACH_SIZE
-        print(x, y)
+        y = y // self.SQ_EACH_SIZE
         return (x, y)

@@ -4,8 +4,8 @@ Main.py file is responsible for running the game engine. It handles user input a
 
 import pygame as p
 import pygame.font
-import ChessEngine
-from interface import UI
+import copies.chessFlipHardcoded as ChessEngine
+from interfaceCopy import UI
 import asyncio
 import inspect
 import sys
@@ -17,8 +17,9 @@ MAX_FPS: int = 15  # Maximum frames per second (controls the game speed).
 
 # Global Game Values
 stockfish: asyncio.subprocess.Process = None
+USERPLAYSWHITE = True
 CLOCK: p.time.Clock = None  # Clock object to manage game updates.
-GameState: ChessEngine.GameState = ChessEngine.GameState()  # Initialize the game state.
+GameState: ChessEngine.GameState = ChessEngine.GameState(USERPLAYSWHITE)  # Initialize the game state.
 MultiPV: int = 1
 
 
@@ -26,24 +27,24 @@ async def main() -> None:
     """
     The main driver for the chess game. This function handles user input and updates the graphics.
     """
-    ui = UI(WIDTH, HEIGHT)
+    ui = UI(WIDTH, HEIGHT, USERPLAYSWHITE)
     screen, CLOCK = ui.setPyGameValues()
     ui.loadImages()  # Load images once to save memory.
     userClicks: list = []  # A list to store the user clicks.
     toHighlight: list = []  # A list to keep track of squares to highlight.
     possibleMoves: list = []  # A list of possible coordinates the selected piece can move to.
     drawGameState(ui, screen, GameState, userClicks, toHighlight, possibleMoves)
-    notationLogs = GameState.getNotationLogs()
-    await subproc("stockfish.exe")
+    notationLogs = GameState.getNotationLog()
+    """await subproc("stockfish.exe")
     await sendCommand(
         f"position fen {ChessEngine.PGN.boardToPGN(GameState.board)} {"w" if GameState.isWhiteTurn else "b"} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()} {("moves " + notationLogs) if notationLogs else ''}\n",
         False,
-    )
-    move = await sendCommand("go movetime 1000\n", True)
+    )"""
+    """move = await sendCommand("go movetime 1000\n", True)"""
 
     p.display.flip()
     while True:
-        eventHandler(ui, toHighlight, userClicks, screen, possibleMoves)
+        await eventHandler(ui, toHighlight, userClicks, screen, possibleMoves)
         CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
         p.display.flip()  # Update the display.
 
@@ -78,6 +79,7 @@ async def subproc(path):
 
 async def sendCommand(command: str, outputNeeded: bool):
     # send command
+
     stockfish.stdin.write(command.encode("ascii"))
     await stockfish.stdin.drain()
     print(command)
@@ -85,9 +87,8 @@ async def sendCommand(command: str, outputNeeded: bool):
         # Read the response
         try:
             while True:
-                line = await asyncio.wait_for(stockfish.stdout.readline(), timeout=10)
+                line = await asyncio.wait_for(stockfish.stdout.readline(), timeout=2)
                 line = line.decode("ascii").strip()
-                print(line)
                 if line.startswith("bestmove"):
                     print(line)
                     break
@@ -123,7 +124,7 @@ def drawGameState(
     ui.draw_places(screen)  # Draw the ranks and files labels.
 
 
-def eventHandler(
+async def eventHandler(
     ui: "UI",
     toHighlight: list,
     userClicks: list,
@@ -147,7 +148,7 @@ def eventHandler(
     for event in p.event.get():
         if event.type == p.QUIT:
             p.quit()
-            exit("QUIT")
+            await terminateProgram("Quit Game")
         elif event.type == p.MOUSEBUTTONUP and event.button == 3:
             # Function to highlight selected squares on right-click.
             squareX, squareY = GameState.findSquare(*p.mouse.get_pos())
@@ -241,6 +242,7 @@ def handleSquareSelection(
             GameState.castle(userClicks[0], userClicks[1])
         elif (userClicks[1], userClicks[0]) in GameState.posMoves:
             if pawnChecks(userClicks):
+                print("promotion")
                 handlePawnPromotion(ui, userClicks, screen, toHighlight, possibleMoves)
             elif enPassantChecks(userClicks):
                 GameState.makeEnPassant(userClicks)

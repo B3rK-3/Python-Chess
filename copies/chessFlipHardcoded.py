@@ -25,14 +25,18 @@ class GameState:
         print("----")
         self.board = [
             ["bR", "__", "__", "__", "bK", "__", "__", "bR"],
-            ["bP", "bP", "bP", "bP", "bP", "bP", "wP", "bP"],
+            ["bP", "wP", "bP", "bP", "bP", "bP", "wP", "bP"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["__", "__", "bQ", "__", "__", "__", "__", "__"],
+            ["__", "__", "__", "__", "__", "wP", "__", "__"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["wP", "wP", "wP", "wP", "wP", "__", "wP", "wP"],
-            ["wR", "__", "wP", "__", "wK", "__", "__", "wR"],
+            ["wP", "bP", "wP", "wP", "wP", "__", "bP", "wP"],
+            ["wR", "__", "__", "__", "wK", "__", "__", "wR"],
         ]
+        if not userPlaysWhite:
+            self.board = self.board[::-1]
+        self.userPlaysWhite = userPlaysWhite
+        print(self.board[0][0])
         self.posMoves = []
         # Indicates whose turn it is; True if it's white's turn, False if black's.
         self.isWhiteTurn = True
@@ -46,7 +50,6 @@ class GameState:
         self.blackCastleRights = [True, True]  # Queen Side, King Side
         self.fiftyMoveRule = 0  # counter for 50 move rule
         self.isCheck = False  # is in check
-        self.userPlaysWhite = userPlaysWhite
         self.genValidMoves(self.board)
 
     def genValidMoves(self, board: list) -> list:
@@ -203,13 +206,25 @@ class GameState:
         elif moveObj.pieceMoved == "bK":
             self.blackCastleRights = [False, False]
         elif moveObj.moverStartSq == (0, 0) or moveObj.otherStartSq == (0, 0):
-            self.blackCastleRights[0] = False
+            if self.userPlaysWhite:
+                self.blackCastleRights[0] = False
+            else:
+                self.whiteCastleRights[0] = False
         elif moveObj.moverStartSq == (0, 7) or moveObj.otherStartSq == (0, 7):
-            self.blackCastleRights[1] = False
+            if self.userPlaysWhite:
+                self.blackCastleRights[1] = False
+            else:
+                self.whiteCastleRights[1] = False
         elif moveObj.moverStartSq == (7, 0) or moveObj.otherStartSq == (7, 0):
-            self.whiteCastleRights[0] = False
+            if self.userPlaysWhite:
+                self.whiteCastleRights[0] = False
+            else:
+                self.blackCastleRights[0] = False
         elif moveObj.moverStartSq == (7, 7) or moveObj.otherStartSq == (7, 7):
-            self.whiteCastleRights[1] = False
+            if self.userPlaysWhite:
+                self.whiteCastleRights[1] = False
+            else:
+                self.blackCastleRights[1] = False
 
     def restoreCastleRights(self):
         # restore the rights by popping the most recent rights in the log
@@ -335,25 +350,51 @@ class GameState:
             # Get the last move made.
             moveObj = self.moveLog[-1]
             # Check if the last move was a pawn moving two squares forward.
-            if (
-                moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
-                and abs(moveObj.moverStartSq[0] - moveObj.moverEndSq[0])
-                == 2  # Moved two squares.
-                and move[1][1] == moveObj.moverEndSq[1]  # Same column as the pawn.
-                and move[0][0]
-                == moveObj.moverEndSq[0]  # Capturing pawn is next to the moved pawn.
-                and (
-                    (
-                        self.isWhiteTurn and move[1][0] - moveObj.moverEndSq[0] == -1
-                    )  # White pawn moving up.
-                    or (
-                        not self.isWhiteTurn
-                        and move[1][0] - moveObj.moverEndSq[0]
-                        == 1  # Black pawn moving down.
+            if self.userPlaysWhite:
+                if (
+                    moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
+                    and abs(moveObj.moverStartSq[0] - moveObj.moverEndSq[0])
+                    == 2  # Moved two squares.
+                    and move[1][1] == moveObj.moverEndSq[1]  # Same column as the pawn.
+                    and move[0][0]
+                    == moveObj.moverEndSq[
+                        0
+                    ]  # Capturing pawn is next to the moved pawn.
+                    and (
+                        (
+                            self.isWhiteTurn
+                            and move[1][0] - moveObj.moverEndSq[0] == -1
+                        )  # White pawn moving up.
+                        or (
+                            not self.isWhiteTurn
+                            and move[1][0] - moveObj.moverEndSq[0]
+                            == 1  # Black pawn moving down.
+                        )
                     )
-                )
-            ):
-                return True  # En passant is possible.
+                ):
+                    return True  # En passant is possible.
+            else:
+                if (
+                    moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
+                    and abs(moveObj.moverStartSq[0] - moveObj.moverEndSq[0])
+                    == 2  # Moved two squares.
+                    and move[1][1] == moveObj.moverEndSq[1]  # Same column as the pawn.
+                    and move[0][0]
+                    == moveObj.moverEndSq[
+                        0
+                    ]  # Capturing pawn is next to the moved pawn.
+                    and (
+                        (
+                            self.isWhiteTurn and move[1][0] - moveObj.moverEndSq[0] == 1
+                        )  # White pawn moving up.
+                        or (
+                            not self.isWhiteTurn
+                            and move[1][0] - moveObj.moverEndSq[0]
+                            == -1  # Black pawn moving down.
+                        )
+                    )
+                ):
+                    return True  # En passant is possible.
         return False  # Not an en passant move.
 
     def pawnMoves(
@@ -383,55 +424,126 @@ class GameState:
             The opponent's color ('w' for white, 'b' for black).
         """
         # Handle en passant conditions.
-        if len(self.moveLog) >= 1:
-            moveObj = self.moveLog[-1]  # Get the last move made.
-            if (
-                moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
-                and abs(moveObj.moverEndSq[0] - moveObj.moverStartSq[0])
-                == 2  # Moved two squares.
-                and row
-                == moveObj.moverEndSq[0]  # Pawn is on the same rank as the moved pawn.
-            ):
-                if col + 1 == moveObj.moverEndSq[1]:
-                    # Check for en passant capture to the right.
-                    if oColor == "b":
-                        possibleMoves.append(((row - 1, col + 1), (row, col)))
-                    else:
-                        possibleMoves.append(((row + 1, col + 1), (row, col)))
-                if col - 1 == moveObj.moverEndSq[1]:
-                    # Check for en passant capture to the left.
-                    if oColor == "b":
-                        possibleMoves.append(((row - 1, col - 1), (row, col)))
-                    else:
-                        possibleMoves.append(((row + 1, col - 1), (row, col)))
-        if piece[0] == "w":
-            # White pawn moves.
-            if row == 6 and board[row - 1][col] == "__" and board[row - 2][col] == "__":
-                # Pawn's first move can be two squares forward if both squares are empty.
-                possibleMoves.append(((row - 2, col), (row, col)))
-            if board[row - 1][col] == "__":
-                # Move one square forward if the square is empty.
-                possibleMoves.append(((row - 1, col), (row, col)))
-            if col - 1 >= 0 and board[row - 1][col - 1][0] == "b":
-                # Capture diagonally to the left if there is a black piece.
-                possibleMoves.append(((row - 1, col - 1), (row, col)))
-            if col + 1 < 8 and board[row - 1][col + 1][0] == "b":
-                # Capture diagonally to the right if there is a black piece.
-                possibleMoves.append(((row - 1, col + 1), (row, col)))
-        elif piece[0] == "b":
-            # Black pawn moves.
-            if row == 1 and board[row + 1][col] == "__" and board[row + 2][col] == "__":
-                # Pawn's first move can be two squares forward if both squares are empty.
-                possibleMoves.append(((row + 2, col), (row, col)))
-            if board[row + 1][col] == "__":
-                # Move one square forward if the square is empty.
-                possibleMoves.append(((row + 1, col), (row, col)))
-            if col - 1 >= 0 and board[row + 1][col - 1][0] == "w":
-                # Capture diagonally to the left if there is a white piece.
-                possibleMoves.append(((row + 1, col - 1), (row, col)))
-            if col + 1 < 8 and board[row + 1][col + 1][0] == "w":
-                # Capture diagonally to the right if there is a white piece.
-                possibleMoves.append(((row + 1, col + 1), (row, col)))
+        if self.userPlaysWhite:
+            if len(self.moveLog) >= 1:
+                moveObj = self.moveLog[-1]  # Get the last move made.
+                if (
+                    moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
+                    and abs(moveObj.moverEndSq[0] - moveObj.moverStartSq[0])
+                    == 2  # Moved two squares.
+                    and row
+                    == moveObj.moverEndSq[
+                        0
+                    ]  # Pawn is on the same rank as the moved pawn.
+                ):
+                    if col + 1 == moveObj.moverEndSq[1]:
+                        # Check for en passant capture to the right.
+                        if oColor == "b":
+                            possibleMoves.append(((row - 1, col + 1), (row, col)))
+                        else:
+                            possibleMoves.append(((row + 1, col + 1), (row, col)))
+                    if col - 1 == moveObj.moverEndSq[1]:
+                        # Check for en passant capture to the left.
+                        if oColor == "b":
+                            possibleMoves.append(((row - 1, col - 1), (row, col)))
+                        else:
+                            possibleMoves.append(((row + 1, col - 1), (row, col)))
+            if piece[0] == "w":
+                # White pawn moves.
+                if (
+                    row == 6
+                    and board[row - 1][col] == "__"
+                    and board[row - 2][col] == "__"
+                ):
+                    # Pawn's first move can be two squares forward if both squares are empty.
+                    possibleMoves.append(((row - 2, col), (row, col)))
+                if board[row - 1][col] == "__":
+                    # Move one square forward if the square is empty.
+                    possibleMoves.append(((row - 1, col), (row, col)))
+                if col - 1 >= 0 and board[row - 1][col - 1][0] == "b":
+                    # Capture diagonally to the left if there is a black piece.
+                    possibleMoves.append(((row - 1, col - 1), (row, col)))
+                if col + 1 < 8 and board[row - 1][col + 1][0] == "b":
+                    # Capture diagonally to the right if there is a black piece.
+                    possibleMoves.append(((row - 1, col + 1), (row, col)))
+            elif piece[0] == "b":
+                # Black pawn moves.
+                if (
+                    row == 1
+                    and board[row + 1][col] == "__"
+                    and board[row + 2][col] == "__"
+                ):
+                    # Pawn's first move can be two squares forward if both squares are empty.
+                    possibleMoves.append(((row + 2, col), (row, col)))
+                if board[row + 1][col] == "__":
+                    # Move one square forward if the square is empty.
+                    possibleMoves.append(((row + 1, col), (row, col)))
+                if col - 1 >= 0 and board[row + 1][col - 1][0] == "w":
+                    # Capture diagonally to the left if there is a white piece.
+                    possibleMoves.append(((row + 1, col - 1), (row, col)))
+                if col + 1 < 8 and board[row + 1][col + 1][0] == "w":
+                    # Capture diagonally to the right if there is a white piece.
+                    possibleMoves.append(((row + 1, col + 1), (row, col)))
+        else:
+            if len(self.moveLog) >= 1:
+                moveObj = self.moveLog[-1]  # Get the last move made.
+                if (
+                    moveObj.pieceMoved[1] == "P"  # Last moved piece was a pawn.
+                    and abs(moveObj.moverEndSq[0] - moveObj.moverStartSq[0])
+                    == 2  # Moved two squares.
+                    and row
+                    == moveObj.moverEndSq[
+                        0
+                    ]  # Pawn is on the same rank as the moved pawn.
+                ):
+                    if col + 1 == moveObj.moverEndSq[1]:
+                        # Check for en passant capture to the right.
+                        if oColor == "b":
+                            possibleMoves.append(((row + 1, col + 1), (row, col)))
+                        else:
+                            possibleMoves.append(((row - 1, col + 1), (row, col)))
+                    if col - 1 == moveObj.moverEndSq[1]:
+                        # Check for en passant capture to the left.
+                        if oColor == "b":
+                            possibleMoves.append(((row + 1, col - 1), (row, col)))
+                        else:
+                            possibleMoves.append(((row - 1, col - 1), (row, col)))
+            if piece[0] == "b":
+                # White pawn moves.
+                if (
+                    row == 6
+                    and board[row - 1][col] == "__"
+                    and board[row - 2][col] == "__"
+                ):
+                    # Pawn's first move can be two squares forward if both squares are empty.
+                    possibleMoves.append(((row - 2, col), (row, col)))
+                if board[row - 1][col] == "__":
+                    # Move one square forward if the square is empty.
+                    possibleMoves.append(((row - 1, col), (row, col)))
+                if col - 1 >= 0 and board[row - 1][col - 1][0] == "w":
+                    # Capture diagonally to the left if there is a black piece.
+                    possibleMoves.append(((row - 1, col - 1), (row, col)))
+                if col + 1 < 8 and board[row - 1][col + 1][0] == "w":
+                    # Capture diagonally to the right if there is a black piece.
+                    possibleMoves.append(((row - 1, col + 1), (row, col)))
+            elif piece[0] == "w":
+                # Black pawn moves.
+                if (
+                    row == 1
+                    and board[row + 1][col] == "__"
+                    and board[row + 2][col] == "__"
+                ):
+                    # Pawn's first move can be two squares forward if both squares are empty.
+                    possibleMoves.append(((row + 2, col), (row, col)))
+                if board[row + 1][col] == "__":
+                    # Move one square forward if the square is empty.
+                    possibleMoves.append(((row + 1, col), (row, col)))
+                if col - 1 >= 0 and board[row + 1][col - 1][0] == "b":
+                    # Capture diagonally to the left if there is a white piece.
+                    possibleMoves.append(((row + 1, col - 1), (row, col)))
+                if col + 1 < 8 and board[row + 1][col + 1][0] == "b":
+                    # Capture diagonally to the right if there is a white piece.
+                    possibleMoves.append(((row + 1, col + 1), (row, col)))
 
     def pawnPromotion(self, move: list, screen: p.Surface) -> str:
         """
@@ -448,104 +560,17 @@ class GameState:
         """
         running = True
         p_names = [
-            "wR",
-            "wB",
-            "wN",
-            "wQ",
-            "bR",
-            "bB",
-            "bN",
-            "bQ",
+            "R",
+            "B",
+            "N",
+            "Q",
         ]  # Possible promotion pieces.
         IMAGES = {}
-        color = ""
-        font = p.font.SysFont("Arial", 15)  # Set the font for text display.
         # Load images for promotion options.
         for e in p_names:
-            IMAGES[e] = p.transform.scale(p.image.load("img/" + e + ".png"), (75, 75))
-        if self.isWhiteTurn:
-            # If it's white's turn, set up the promotion options for white.
-            color = "w"
-            shift = 75 * (move[0][1] - 4) if move[0][1] > 4 else 0
-            # Draw the promotion selection rectangle.
-            rect = p.draw.rect(
-                screen,
-                (255, 204, 117),  # Background color.
-                (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 4 * 75, 90),
-                border_radius=5,
-            )
-            rect = p.draw.rect(
-                screen,
-                (0, 0, 0),  # Border color.
-                (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 300, 90),
-                2,
-                5,
-            )
-            for i in range(4):
-                # Display each promotion option.
-                screen.blit(
-                    IMAGES[p_names[i]],  # The image of the piece.
-                    p.Rect(
-                        i * 75 + move[0][1] * 75 - 5 - shift,
-                        (move[0][0]) * 75 + 100,
-                        75,
-                        75,
-                    ),
-                )
-                f = font.render(
-                    str(i + 1), True, (0, 0, 0)
-                )  # Render the option number.
-                screen.blit(
-                    f,
-                    p.Rect(
-                        i * 75 + move[0][1] * 75 + 30 - shift,
-                        (move[0][0]) * 75 + 170,
-                        75,
-                        75,
-                    ),
-                )
-        else:
-            # If it's black's turn, set up the promotion options for black.
-            color = "b"
-            shift = 75 * (move[0][1] - 4) if move[0][1] > 4 else 0
-            # Draw the promotion selection rectangle.
-            rect = p.draw.rect(
-                screen,
-                (255, 204, 117),  # Background color.
-                (move[0][1] * 75 - shift, (move[0][0]) * 75 - 100, 4 * 75, 90),
-                border_radius=5,
-            )
-            rect = p.draw.rect(
-                screen,
-                (0, 0, 0),  # Border color.
-                (move[0][1] * 75 - shift, (move[0][0]) * 75 - 100, 300, 90),
-                2,
-                5,
-            )
-            for i in range(4, len(p_names)):
-                # Display each promotion option.
-                screen.blit(
-                    IMAGES[p_names[i]],  # The image of the piece.
-                    p.Rect(
-                        i * 75 + move[0][1] * 75 - 303 - shift,
-                        (move[0][0]) * 75 - 100,
-                        75,
-                        75,
-                    ),
-                )
-                f = font.render(
-                    str(i - 3), True, (0, 0, 0)
-                )  # Render the option number.
-                screen.blit(
-                    f,
-                    p.Rect(
-                        i * 75 + move[0][1] * 75 - 268.5 - shift,
-                        (move[0][0]) * 75 - 28,
-                        75,
-                        75,
-                    ),
-                )
-        p.display.flip()  # Update the display.
+            IMAGES["w" + e] = p.transform.scale(p.image.load(f"img/w{e}.png"), (75, 75))
+            IMAGES["b" + e] = p.transform.scale(p.image.load(f"img/b{e}.png"), (75, 75))
+        self.drawToScreen(move, screen, IMAGES, p_names)
         while running:
             for e in p.event.get():
                 if e.type == p.QUIT:
@@ -566,6 +591,98 @@ class GameState:
                         running = False
                         return "Q"  # Promote to Queen.
         return None
+
+    def drawToScreen(self, move: list, screen: p.Surface, IMAGES: dict, p_names: list):
+        font = p.font.SysFont("Arial", 15)  # Set the font for text display.
+        whiteBottom = self.userPlaysWhite and self.isWhiteTurn  # top
+        blackTop = self.userPlaysWhite and not self.isWhiteTurn
+        whiteTop = not self.userPlaysWhite and self.isWhiteTurn
+        blackBottom = not self.userPlaysWhite and not self.isWhiteTurn
+        # If pawn promotion is at the top
+        if (whiteBottom) or (blackBottom):
+            color = "w" if whiteBottom else "b"
+            # Set up the promotion options for white.
+            shift = 75 * (move[0][1] - 4) if move[0][1] > 4 else 0
+            # Draw the promotion selection rectangle.
+            p.draw.rect(
+                screen,
+                (255, 204, 117),  # Background color.
+                (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 4 * 75, 90),
+                border_radius=5,
+            )
+            p.draw.rect(
+                screen,
+                (0, 0, 0),  # Border color.
+                (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 300, 90),
+                2,
+                5,
+            )
+            for i in range(4):
+                # Display each promotion option.
+                screen.blit(
+                    IMAGES[color + p_names[i]],  # The image of the piece.
+                    p.Rect(
+                        i * 75 + move[0][1] * 75 - 5 - shift,
+                        (move[0][0]) * 75 + 100,
+                        75,
+                        75,
+                    ),
+                )
+                f = font.render(
+                    str(i + 1), True, (0, 0, 0)
+                )  # Render the option number.
+                screen.blit(
+                    f,
+                    p.Rect(
+                        i * 75 + move[0][1] * 75 + 30 - shift,
+                        (move[0][0]) * 75 + 170,
+                        75,
+                        75,
+                    ),
+                )
+        # If the pawn promotion is on the bottom
+        else:
+            # Set up the promotion options for black.
+            color = "w" if whiteTop else "b"
+            shift = 75 * (move[0][1] - 4) if move[0][1] > 4 else 0
+            # Draw the promotion selection rectangle.
+            p.draw.rect(
+                screen,
+                (255, 204, 117),  # Background color.
+                (move[0][1] * 75 - shift, (move[0][0]) * 75 - 100, 4 * 75, 90),
+                border_radius=5,
+            )
+            p.draw.rect(
+                screen,
+                (0, 0, 0),  # Border color.
+                (move[0][1] * 75 - shift, (move[0][0]) * 75 - 100, 300, 90),
+                2,
+                5,
+            )
+            for i in range(4):
+                # Display each promotion option.
+                screen.blit(
+                    IMAGES[color + p_names[i]],  # The image of the piece.
+                    p.Rect(
+                        (i + 4) * 75 + move[0][1] * 75 - 303 - shift,
+                        (move[0][0]) * 75 - 100,
+                        75,
+                        75,
+                    ),
+                )
+                f = font.render(
+                    str((i + 4) - 3), True, (0, 0, 0)
+                )  # Render the option number.
+                screen.blit(
+                    f,
+                    p.Rect(
+                        (i + 4) * 75 + move[0][1] * 75 - 268.5 - shift,
+                        (move[0][0]) * 75 - 28,
+                        75,
+                        75,
+                    ),
+                )
+        p.display.flip()  # Update the display.
 
     def knightMoves(
         self,
@@ -1023,6 +1140,7 @@ class GameState:
             The list of user clicks (current move).
         """
         moveObj = self.moveLog[-1]
+        print(moveObj, 1)
         # Create the en passant move.
         moveObj = Move(
             userClicks,  # Piece moved.
@@ -1033,27 +1151,36 @@ class GameState:
         self.makeMove(moveObj)
 
     def getCastleString(self):
-        # method to get the castling sides in string
-        # FEN format
+        """
+        Method to get the FEN string part for castling rights.
+        Example: KQkq, Kkq
+        Refer to the Chess Programming Wiki
+        
+        Returns:
+        - castleRights: str
+        """
         white = f"{"K" if self.whiteCastleRights[1] else ""}{"Q" if self.whiteCastleRights[0] else ""}"
         black = f"{"k" if self.blackCastleRights[1] else ""}{"q" if self.blackCastleRights[0] else ""}"
         return "-" if not white and not black else white + black
 
     def numOfMoves(self):
-        # return the number of moves
+        """Return numbers of moves played."""
         return max(len(self.moveLog), 1)
 
-    def getNotationLogs(self):
+    def getNotationLog(self):
+        """
+        Returns the move log in notation format.
+        Used for stockfish -- position fen __ moves getNotationLog().
+
+        :Returns:
+        - notations: list[str]
+        """
         notations = ""
         for log in self.moveLog:
             notations += log.__str__()
-        return notations 
-    
-    def getBoard(self):
-        if self.userPlaysWhite:
-            return self.board
-        else:
-            return [[("w" if p[0] == "b" else ("b" if p[0] != "_" else "_")) + p[1] for p in row] for row in self.board]
+        return notations
+
+
 class Move:
     """
     Represents a chess move with support for special moves such as castling, en passant, and pawn promotion.

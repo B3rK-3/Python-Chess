@@ -4,8 +4,9 @@ Main.py file is responsible for running the game engine. It handles user input a
 
 import pygame as p
 import pygame.font
-import ChessEngine
+import copies.chessFlipHardcoded as ChessEngine
 from interface import UI
+import asyncio
 import inspect
 import sys
 
@@ -15,28 +16,83 @@ HEIGHT: int = 600  # The height of the game window.
 MAX_FPS: int = 15  # Maximum frames per second (controls the game speed).
 
 # Global Game Values
+stockfish: asyncio.subprocess.Process = None
+USERPLAYSWHITE = False
 CLOCK: p.time.Clock = None  # Clock object to manage game updates.
-GameState: ChessEngine.GameState = ChessEngine.GameState()  # Initialize the game state.
+GameState: ChessEngine.GameState = ChessEngine.GameState(USERPLAYSWHITE)  # Initialize the game state.
+MultiPV: int = 1
 
 
-def main() -> None:
+async def main() -> None:
     """
     The main driver for the chess game. This function handles user input and updates the graphics.
     """
-    ui = UI(WIDTH, HEIGHT)
+    ui = UI(WIDTH, HEIGHT, USERPLAYSWHITE)
     screen, CLOCK = ui.setPyGameValues()
     ui.loadImages()  # Load images once to save memory.
     userClicks: list = []  # A list to store the user clicks.
     toHighlight: list = []  # A list to keep track of squares to highlight.
     possibleMoves: list = []  # A list of possible coordinates the selected piece can move to.
-    flipped = [False]
-    drawGameState(
-        ui, screen, GameState, userClicks, toHighlight, possibleMoves, flipped
+    drawGameState(ui, screen, GameState, userClicks, toHighlight, possibleMoves)
+    notationLogs = GameState.getNotationLogs()
+    await subproc("stockfish.exe")
+    await sendCommand(
+        f"position fen {ChessEngine.PGN.boardToPGN(GameState.getBoard())} {"w" if GameState.isWhiteTurn else "b"} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()} {("moves " + notationLogs) if notationLogs else ''}\n",
+        False,
     )
+    move = await sendCommand("go movetime 1000\n", True)
 
+    p.display.flip()
     while True:
-        eventHandler(ui, toHighlight, userClicks, screen, possibleMoves, flipped)
+        await eventHandler(ui, toHighlight, userClicks, screen, possibleMoves)
         CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
+        p.display.flip()  # Update the display.
+
+
+async def subproc(path):
+    global stockfish
+    # try and create a stockfish subprocess with provided path
+    try:
+        stockfish = await asyncio.create_subprocess_exec(
+            path,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        await terminateProgram("Provided path does not exist!")
+
+    # Send the "uci" command
+    stockfish.stdin.write(b"uci\n")
+    await stockfish.stdin.drain()
+
+    # Read the response
+    try:
+        while True:
+            line = await asyncio.wait_for(stockfish.stdout.readline(), timeout=2)
+            if line.decode("ascii").strip() == "uciok":
+                print("Stockfish working")
+                break
+    except asyncio.TimeoutError:
+        await terminateProgram("Stockfish did not respond as expected!")
+
+
+async def sendCommand(command: str, outputNeeded: bool):
+    # send command
+    stockfish.stdin.write(command.encode("ascii"))
+    await stockfish.stdin.drain()
+    print(command)
+    if outputNeeded:
+        # Read the response
+        try:
+            while True:
+                line = await asyncio.wait_for(stockfish.stdout.readline(), timeout=10)
+                line = line.decode("ascii").strip()
+                if line.startswith("bestmove"):
+                    print(line)
+                    break
+        except asyncio.TimeoutError:
+            await terminateProgram("Stockfish did not respond as expected!")
 
 
 def drawGameState(
@@ -46,7 +102,6 @@ def drawGameState(
     draw: list,
     highlight: list,
     possibleMoves: list,
-    flipped: list[bool],
 ) -> None:
     """
     Responsible for drawing the current game state on the screen.
@@ -64,19 +119,16 @@ def drawGameState(
         A list of possible moves for the selected piece.
     """
     ui.draw_board(screen, draw, highlight, possibleMoves)  # Draw the chessboard.
-    ui.draw_pieces(screen, gs.board, flipped[0])  # Draw the chess pieces on the board.
-    screen.blit(p.transform.flip(screen, False, flipped[0]), (0, 0))
-    ui.draw_places(screen, flipped[0])  # Draw the ranks and files labels.
-    p.display.flip()  # Update the display.
+    ui.draw_pieces(screen, gs.board)  # Draw the chess pieces on the board.
+    ui.draw_places(screen)  # Draw the ranks and files labels.
 
 
-def eventHandler(
+async def eventHandler(
     ui: "UI",
     toHighlight: list,
     userClicks: list,
     screen: p.Surface,
     possibleMoves: list,
-    flipped: list[bool],
 ) -> None:
     """
     Handles all the events (mouse clicks, key presses) during the game loop.
@@ -95,23 +147,17 @@ def eventHandler(
     for event in p.event.get():
         if event.type == p.QUIT:
             p.quit()
-            exit("QUIT")
+            await terminateProgram("Quit Game")
         elif event.type == p.MOUSEBUTTONUP and event.button == 3:
             # Function to highlight selected squares on right-click.
-            squareX, squareY = GameState.findSquare(*p.mouse.get_pos(), flipped[0])
+            squareX, squareY = GameState.findSquare(*p.mouse.get_pos())
             squareHighlight(squareX, squareY, toHighlight)
             redraw = True
         elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
             # Handle left-click for moving pieces.
             possibleMoves.clear()
             handleSquareSelection(
-                ui,
-                *p.mouse.get_pos(),
-                userClicks,
-                toHighlight,
-                screen,
-                possibleMoves,
-                flipped,
+                ui, *p.mouse.get_pos(), userClicks, toHighlight, screen, possibleMoves
             )
             redraw = True
         elif event.type == p.KEYDOWN and event.key == p.K_LEFT:
@@ -120,13 +166,8 @@ def eventHandler(
             possibleMoves.clear()
             toHighlight.clear()
             redraw = True
-        elif event.type == p.KEYDOWN and event.key == p.K_f:
-            flipped[0] = not flipped[0]
-            redraw = True
     if redraw:
-        drawGameState(
-            ui, screen, GameState, userClicks, toHighlight, possibleMoves, flipped
-        )
+        drawGameState(ui, screen, GameState, userClicks, toHighlight, possibleMoves)
 
 
 def handleLeftButtonDown(userClicks: list) -> bool:
@@ -169,7 +210,6 @@ def handleSquareSelection(
     toHighlight: list,
     screen: p.Surface,
     possibleMoves: list,
-    flipped: list[bool],
 ) -> None:
     """
     Handles the selection of squares when the user clicks on the board.
@@ -192,7 +232,7 @@ def handleSquareSelection(
     if not (mouseX < WIDTH and mouseY < HEIGHT):
         return  # Out of bounds.
     # Get the square coordinates.
-    squareX, squareY = ui.findSquare(mouseX, mouseY, flipped[0])
+    squareX, squareY = ui.findSquare(mouseX, mouseY)
     if len(userClicks) == 1:
         userClicks.append((squareY, squareX))
         # Check for castling move.
@@ -201,9 +241,7 @@ def handleSquareSelection(
             GameState.castle(userClicks[0], userClicks[1])
         elif (userClicks[1], userClicks[0]) in GameState.posMoves:
             if pawnChecks(userClicks):
-                handlePawnPromotion(
-                    ui, userClicks, screen, toHighlight, possibleMoves, flipped
-                )
+                handlePawnPromotion(ui, userClicks, screen, toHighlight, possibleMoves)
             elif enPassantChecks(userClicks):
                 GameState.makeEnPassant(userClicks)
             else:
@@ -292,7 +330,6 @@ def handlePawnPromotion(
     screen: p.Surface,
     toHighlight: list,
     possibleMoves: list,
-    flipped: list[bool],
 ) -> None:
     """
     Handles pawn promotion when a pawn reaches the opposite end of the board.
@@ -308,9 +345,8 @@ def handlePawnPromotion(
         Possible moves for the selected piece.
     """
     # Redraw the game state to update the display before promotion.
-    drawGameState(
-        ui, screen, GameState, userClicks, toHighlight, possibleMoves, flipped
-    )
+    drawGameState(ui, screen, GameState, userClicks, toHighlight, possibleMoves)
+    p.display.flip()
     # Prompt the player for the piece to promote to.
     piece = GameState.pawnPromotion(
         ((userClicks[1][0], userClicks[1][1]), (userClicks[0][0], userClicks[0][1])),
@@ -341,4 +377,4 @@ async def terminateProgram(*args):
 
 
 if __name__ == "__main__":
-    main()  # Start the game.
+    asyncio.run(main())  # Start the game.
