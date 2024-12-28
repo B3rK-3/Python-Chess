@@ -24,14 +24,14 @@ class GameState:
         print("GAME START")
         print("----")
         self.board = [
-            ["bR", "__", "__", "__", "bK", "__", "__", "bR"],
-            ["bP", "bP", "bP", "bP", "bP", "bP", "wP", "bP"],
-            ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["__", "__", "bQ", "__", "__", "__", "__", "__"],
+            ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
+            ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
             ["__", "__", "__", "__", "__", "__", "__", "__"],
-            ["wP", "wP", "wP", "wP", "wP", "__", "wP", "wP"],
-            ["wR", "__", "wP", "__", "wK", "__", "__", "wR"],
+            ["__", "__", "__", "__", "__", "__", "__", "__"],
+            ["__", "__", "__", "__", "__", "__", "__", "__"],
+            ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
+            ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
         ]
         self.posMoves = []
         # Indicates whose turn it is; True if it's white's turn, False if black's.
@@ -42,11 +42,29 @@ class GameState:
         self.enPassantLog: list[str] = []
         self.enPassantPlace: str = "-"
         # castle rights (whiteCastleRights, blackCastleRights)
-        self.whiteCastleRights = [True, True]  # Queen Side, King Side
-        self.blackCastleRights = [True, True]  # Queen Side, King Side
+        self.whiteCastleRights = [
+            True,
+            True,
+            False,
+            False,
+            False,
+        ]  # Queen Side, King Side, Left Rook Moved, King Moved, Right Rook Moved
+        self.blackCastleRights = [
+            True,
+            True,
+            False,
+            False,
+            False,
+        ]  # Queen Side, King Side, Left Rook Moved, King Moved, Right Rook Moved
         self.fiftyMoveRule = 0  # counter for 50 move rule
         self.isCheck = False  # is in check
         self.userPlaysWhite = userPlaysWhite
+
+        #
+        self.isWhiteTurn = not self.isWhiteTurn
+        kingPos = self.posOfPiece("wK" if self.isWhiteTurn else "bK")[0]
+        self.updateCastlingRights(kingPos)
+        self.isWhiteTurn = not self.isWhiteTurn
         self.genValidMoves(self.board)
 
     def genValidMoves(self, board: list) -> list:
@@ -66,8 +84,6 @@ class GameState:
         self.kingPos = self.posOfPiece("wK" if self.isWhiteTurn else "bK")[0]
         # Generate all possible moves (not necessarily valid).
         self.posMoves = self.genPossibleMoves(board)
-        # update the castling
-        self.updateCastlingRights(self.kingPos)
         # Check if the king is in check.
         toDelete = self.checkAroundKing(self.kingPos)
         self.isCheck = False
@@ -79,6 +95,9 @@ class GameState:
                 continue
             self.posMoves.pop(i)
             setToDelete.add(i)
+        # update the castling
+        self.updateCastlingRights(self.kingPos)
+
         if self.posMoves == [] and self.isCheck:
             # If there are no valid moves and the king is in check, it's checkmate.
             self.moveLog[-1].checkOrMate = "#"
@@ -163,10 +182,10 @@ class GameState:
         self.enPassantPlace = "-"
 
         # fifty-move rule conditions
-        if moveObj.pieceMoved[1] == "K":
-            self.fiftyMoveRule += 1
-        elif moveObj.pieceOther[1] == "P" or moveObj.isPieceCaptured:
+        if moveObj.pieceMoved[1] == "P" or moveObj.isPieceCaptured:
             self.fiftyMoveRule = 0
+        else:
+            self.fiftyMoveRule += 1
 
         # check if the pawn has been double pawn moved
         if (
@@ -179,7 +198,7 @@ class GameState:
                     moveObj.moverEndSq[1],
                 )
             )
-
+        self.removeCastleRights(moveObj)
         # Generate the valid moves
         self.genValidMoves(self.board)
 
@@ -193,23 +212,26 @@ class GameState:
                 copy.deepcopy(self.blackCastleRights),
             )
         )
-        self.removeCastleRights(moveObj)
-        print(moveObj)
+        print(f"Move: {moveObj}")
 
     def removeCastleRights(self, moveObj: "Move"):
         # removing castling rights logic according to moved piece
         if moveObj.pieceMoved == "wK":
-            self.whiteCastleRights = [False, False]
+            self.whiteCastleRights = [False, False, False, True, False]
         elif moveObj.pieceMoved == "bK":
-            self.blackCastleRights = [False, False]
-        elif moveObj.moverStartSq == (0, 0) or moveObj.otherStartSq == (0, 0):
+            self.blackCastleRights = [False, False, False, True, False]
+        elif moveObj.moverStartSq == (0, 0) or moveObj.moverEndSq == (0, 0):
             self.blackCastleRights[0] = False
-        elif moveObj.moverStartSq == (0, 7) or moveObj.otherStartSq == (0, 7):
+            self.blackCastleRights[2] = True
+        elif moveObj.moverStartSq == (0, 7) or moveObj.moverEndSq == (0, 7):
             self.blackCastleRights[1] = False
-        elif moveObj.moverStartSq == (7, 0) or moveObj.otherStartSq == (7, 0):
+            self.blackCastleRights[4] = True
+        elif moveObj.moverStartSq == (7, 0) or moveObj.moverEndSq == (7, 0):
             self.whiteCastleRights[0] = False
-        elif moveObj.moverStartSq == (7, 7) or moveObj.otherStartSq == (7, 7):
+            self.whiteCastleRights[2] = True
+        elif moveObj.moverStartSq == (7, 7) or moveObj.moverEndSq == (7, 7):
             self.whiteCastleRights[1] = False
+            self.whiteCastleRights[4] = True
 
     def restoreCastleRights(self):
         # restore the rights by popping the most recent rights in the log
@@ -242,10 +264,18 @@ class GameState:
             self.restoreCastleRights()
             # regenerate possible moves
             self.genValidMoves(self.board)
+            print("----")
+            print(f"Undo Move: {moveObj}")
 
     def updateCastlingRights(self, kingPos: tuple):
-        if self.isCheck:
+        if (
+            self.isCheck
+            or (self.isWhiteTurn and self.whiteCastleRights[3])
+            or (not self.isWhiteTurn and self.blackCastleRights[3])
+        ):
+            # print("Threat 0")
             self.disableCastlingRights()
+            return
 
         # Generate opponent's moves to check for threats along the castling path.
         self.isWhiteTurn = not self.isWhiteTurn  # Switch turn to opponent.
@@ -258,31 +288,72 @@ class GameState:
 
         if rights[0]:
             self.posMoves.append(((row, 0), kingPos))
-            print("Can castle queenside")
         if rights[1]:
             self.posMoves.append(((row, 7), kingPos))
-            print("Can castle kingside")
+        print("Castle Rights:", self.getCastleString())
 
     def disableCastlingRights(self):
         if self.isWhiteTurn:
-            self.whiteCastleRights = [False, False]
+            self.whiteCastleRights[0] = False
+            self.whiteCastleRights[1] = False
         else:
-            self.blackCastleRights = [False, False]
+            self.blackCastleRights[0] = False
+            self.blackCastleRights[1] = False
 
     def checkCastlingPath(self, row: int, opponentMoves: tuple):
         # Check if any opponent's move attacks the king's row.
         for r, c in opponentMoves:
             if r == row:
                 if 4 <= c < 7:  # Threat on the kingside path.
+                    # print("Threat 1")
                     self.disableKingsideCastling()
                 elif 0 < c <= 4:  # Threat on the queenside path.
+                    # print("Threat 2")
                     self.disableQueensideCastling()
 
         # Check for blocking pieces on castling paths.
         if any(self.board[row][c] != "__" for c in (1, 2, 3)):
+            # print("Threat 3")
             self.disableQueensideCastling()
+        else:
+            if not (
+                (self.isWhiteTurn and self.whiteCastleRights[2])
+                or (not self.isWhiteTurn and self.blackCastleRights[2])
+            ):
+                self.enableQueensideCastling()
+
         if any(self.board[row][c] != "__" for c in (5, 6)):
+            # print("Threat 4")
             self.disableKingsideCastling()
+        else:
+            if not (
+                (self.isWhiteTurn and self.whiteCastleRights[4])
+                or (not self.isWhiteTurn and self.blackCastleRights[4])
+            ):
+                self.enableKingsideCastling()
+
+        self.isWhiteTurn = not self.isWhiteTurn
+        # Check for blocking pieces on castling paths.
+        if any(self.board[7 - row][c] != "__" for c in (1, 2, 3)):
+            # print("Threat 3")
+            self.disableQueensideCastling()
+        else:
+            if not (
+                (self.isWhiteTurn and self.whiteCastleRights[2])
+                or (not self.isWhiteTurn and self.blackCastleRights[2])
+            ):
+                self.enableQueensideCastling()
+
+        if any(self.board[7 - row][c] != "__" for c in (5, 6)):
+            # print("Threat 4")
+            self.disableKingsideCastling()
+        else:
+            if not (
+                (self.isWhiteTurn and self.whiteCastleRights[4])
+                or (not self.isWhiteTurn and self.blackCastleRights[4])
+            ):
+                self.enableKingsideCastling()
+        self.isWhiteTurn = not self.isWhiteTurn
 
     def disableKingsideCastling(self):
         if self.isWhiteTurn:
@@ -290,11 +361,23 @@ class GameState:
         else:
             self.blackCastleRights[1] = False
 
+    def enableKingsideCastling(self):
+        if self.isWhiteTurn:
+            self.whiteCastleRights[1] = True
+        else:
+            self.blackCastleRights[1] = True
+
     def disableQueensideCastling(self):
         if self.isWhiteTurn:
             self.whiteCastleRights[0] = False
         else:
             self.blackCastleRights[0] = False
+
+    def enableQueensideCastling(self):
+        if self.isWhiteTurn:
+            self.whiteCastleRights[0] = True
+        else:
+            self.blackCastleRights[0] = True
 
     def castle(self, kingPos: tuple, rookPos: tuple) -> None:
         """
@@ -433,7 +516,7 @@ class GameState:
                 # Capture diagonally to the right if there is a white piece.
                 possibleMoves.append(((row + 1, col + 1), (row, col)))
 
-    def pawnPromotion(self, move: list, screen: p.Surface) -> str:
+    def pawnPromotion(self, move: list, screen: p.Surface, promoteTo: str = "") -> str:
         """
         Handles pawn promotion when a pawn reaches the opposite end of the board.
 
@@ -565,7 +648,7 @@ class GameState:
                     elif e.key == p.K_4:
                         running = False
                         return "Q"  # Promote to Queen.
-        return None
+        return
 
     def knightMoves(
         self,
@@ -777,25 +860,33 @@ class GameState:
                     else:
                         if locOwnColor:
                             # An opponent's piece is behind our own piece, which might be pinned.
-                            print("Pin: ", (r, c), "{", move, "} ", piece)
+                            print(
+                                f"Possible Pin - Pinner: {Move.get_square((r,c))} - Dir: {move} - Pinner: {piece}"
+                            )
                             self.pinned((r, c), locOwnColor, move, piece[1], toDelete)
                             locOwnColor = False
                             break
                         # Check for checks from opponent pieces.
                         elif (c_off == 0 or r_off == 0) and (pType in "RQ"):
                             # Straight line checks (rook or queen).
-                            print("Rem: ", (r, c), "{", move, "} ", piece[1])
+                            print(
+                                f"Rem Move - Square: {Move.get_square((r,c))} - Dir: {move} - Piece: {piece[1]}"
+                            )
                             self.remMoves(r, c, True, toDelete, king)
                         elif (c_off != 0 and r_off != 0) and (pType in "BQ"):
                             # Diagonal checks (bishop or queen).
-                            print("Rem: ", (r, c), "{", move, "} ", piece[1])
+                            print(
+                                f"Rem Move - Square: {Move.get_square((r, c))} - Dir: {move} - Piece: {piece[1]}"
+                            )
                             self.remMoves(r, c, False, toDelete, king)
                         elif (
                             (currColor == "w" and r_off == -1 and abs(c_off) == 1)
                             or (currColor == "b" and r_off == 1 and abs(c_off) == 1)
                         ) and (pType == "P"):
                             # Check for pawn checks.
-                            print("Rem: ", (r, c), "{", move, "} ", piece[1])
+                            print(
+                                f"Rem Move - Square: {Move.get_square((r, c))} - Dir: {move} - Piece: {piece[1]}"
+                            )
                             self.remMoves(r, c, False, toDelete, king)
                         else:
                             break
@@ -889,8 +980,8 @@ class GameState:
                 # Simulate the king's move.
                 b[piece[0][0]][piece[0][1]] = b[self.kingPos[0]][self.kingPos[1]]
                 b[self.kingPos[0]][self.kingPos[1]] = "__"
-                self.isWhiteTurn = not self.isWhiteTurn
                 # Generate opponent's possible moves.
+                self.isWhiteTurn = not self.isWhiteTurn
                 moves = self.genPossibleMoves(b)
                 # If the destination square is attacked, remove the move.
                 if (piece[0][0], piece[0][1]) in [x[0] for x in moves]:
@@ -1011,6 +1102,8 @@ class GameState:
         return (
             self.board[userClicks[0][0]][userClicks[0][1]][1] == "K"
             and self.board[userClicks[1][0]][userClicks[1][1]][1] == "R"
+            and self.board[userClicks[0][0]][userClicks[0][1]][0]
+            == self.board[userClicks[1][0]][userClicks[1][1]][0]
             and tuple(userClicks[::-1]) in self.posMoves
         )
 
@@ -1041,19 +1134,30 @@ class GameState:
 
     def numOfMoves(self):
         # return the number of moves
-        return max(len(self.moveLog), 1)
+        return max(len(self.moveLog) // 2, 1)
 
-    def getNotationLogs(self):
+    def getNotationLog(self):
         notations = ""
         for log in self.moveLog:
             notations += log.__str__()
-        return notations 
-    
+        return notations
+
     def getBoard(self):
         if self.userPlaysWhite:
             return self.board
         else:
-            return [[("w" if p[0] == "b" else ("b" if p[0] != "_" else "_")) + p[1] for p in row] for row in self.board]
+            return [
+                [
+                    ("w" if p[0] == "b" else ("b" if p[0] != "_" else "_")) + p[1]
+                    for p in row
+                ]
+                for row in self.board
+            ]
+
+    def pieceColor(self, y, x):
+        return self.board[y][x][0]
+
+
 class Move:
     """
     Represents a chess move with support for special moves such as castling, en passant, and pawn promotion.
@@ -1120,7 +1224,6 @@ class Move:
             if (self.pieceOther != "__" and self.pieceMoved[0] != self.pieceOther[0])
             else False
         )
-        print("Piece is captured", self.isPieceCaptured)
         self.promotedTo: str = promotedTo
         self.type: int = typeOfMove
         self.checkOrMate = ""
@@ -1179,6 +1282,22 @@ class Move:
         rank = Move.ROWS_TO_RANKS[sq[0]]  # Convert row index to rank number.
         file = Move.COLS_TO_FILES[sq[1]]  # Convert column index to file letter.
         return f"{file}{rank}"
+
+    @staticmethod
+    def parseSquare(sq: str, board: list[list[str]]):
+        sq = sq.replace("+", "").replace("#", "").replace("x", "")
+        start = (8 - int(sq[1]), Move.FILES_TO_COLS[sq[0]])
+        end = (8 - int(sq[3]), Move.FILES_TO_COLS[sq[2]])
+        piece = board[start[0]][start[1]]
+        if piece[1] == "K" and abs(start[1] - end[1]) == 2:
+            if end[1] == 6:
+                end = (end[0], end[1] + 1)
+            else:
+                end = (end[0], end[1] - 1)
+        promote = ""
+        if len(sq) > 4:
+            promote = sq[4].upper()
+        return (start, end, promote)
 
 
 class PGN:

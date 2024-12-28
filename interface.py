@@ -5,13 +5,13 @@ import pygame.font
 SIZE: int = 8  # The size of the chessboard (8x8).
 LIGHT_SQUARE_COLOR: p.Color = p.Color(227, 193, 111)  # Light square color.
 DARK_SQUARE_COLOR: p.Color = p.Color(184, 139, 74)  # Dark square color.
-HIGHLIGHT_COLOR: tuple = (255, 204, 0, 100)  # Color for highlighting squares.
+HIGHLIGHT_COLOR: tuple = (255, 255, 102, 100)  # Color for highlighting squares.
 MOVE_HIGHLIGHT_COLOR: tuple = (255, 255, 102, 200)  # Color for move highlights.
-POSSIBLE_MOVES: tuple = (255, 234, 0, 128)  # Color for possible moves highlights.
+POSSIBLE_MOVES: tuple = (255, 255, 0, 128)  # Color for possible moves highlights.
 
 
 class UI:
-    def __init__(self, width: int, height: int, whiteOnBottom: int = True):
+    def __init__(self, width: int, height: int):
         self.height = height
         self.width = width
         self.SQ_EACH_SIZE: int = (
@@ -20,7 +20,6 @@ class UI:
         self.IMAGES: dict[
             str, p.Surface
         ] = {}  # A dictionary to store images of the chess pieces.
-        self.whiteFirst = whiteOnBottom
 
     def loadImages(self) -> None:
         """
@@ -45,7 +44,7 @@ class UI:
             # Load and scale the image for each piece, then store it in the IMAGES dictionary.
             self.IMAGES[piece] = p.transform.scale(
                 p.image.load(
-                    f"./img/{(piece if self.whiteFirst else ("b" if piece[0] == "w" else "w") + piece[1])}.png"
+                    f"./img/{piece}.png"
                 ),
                 (self.SQ_EACH_SIZE, self.SQ_EACH_SIZE),
             )
@@ -66,24 +65,15 @@ class UI:
         - possibleMoves: list
             Possible moves for the selected piece.
         """
-        if self.whiteFirst:
-            colors = [
-                LIGHT_SQUARE_COLOR,
-                DARK_SQUARE_COLOR,
-            ]  # Light and dark square colors.
-        else:
-            colors = [
-                DARK_SQUARE_COLOR,
-                LIGHT_SQUARE_COLOR,
-            ]  # Light and dark square colors.
+        colors = [
+            LIGHT_SQUARE_COLOR,
+            DARK_SQUARE_COLOR,
+        ]  # Light and dark square colors.
         for r in range(SIZE):
             for c in range(SIZE):
                 modified = False
                 color = colors[(r + c) % 2]  # Alternate color based on row and column.
-                if (r, c) in highlight:
-                    color = HIGHLIGHT_COLOR
-                    modified = True
-                elif (r, c) in draw:
+                if (r, c) in draw:
                     p.draw.rect(
                         screen,
                         color,
@@ -129,6 +119,16 @@ class UI:
             )  # Use SRCALPHA for transparency.
             overlay.fill(
                 POSSIBLE_MOVES
+            )  # Add an alpha value (0-255), 128 is semi-transparent.
+            # Draw the transparent rectangle on the screen.
+            screen.blit(overlay, (c * self.SQ_EACH_SIZE, r * self.SQ_EACH_SIZE))
+        for r, c in highlight:
+            # Create a semi-transparent surface for possible moves.
+            overlay = p.Surface(
+                (self.SQ_EACH_SIZE, self.SQ_EACH_SIZE), p.SRCALPHA
+            )  # Use SRCALPHA for transparency.
+            overlay.fill(
+                HIGHLIGHT_COLOR
             )  # Add an alpha value (0-255), 128 is semi-transparent.
             # Draw the transparent rectangle on the screen.
             screen.blit(overlay, (c * self.SQ_EACH_SIZE, r * self.SQ_EACH_SIZE))
@@ -227,5 +227,4 @@ class UI:
         """
         x = x // self.SQ_EACH_SIZE
         y = ((600 - y) if flipped else y) // self.SQ_EACH_SIZE
-        print(x, y)
         return (x, y)
