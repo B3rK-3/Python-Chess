@@ -484,23 +484,21 @@ class GameState:
             "bQ",
         ]  # Possible promotion pieces.
         IMAGES = {}
-        color = ""
         font = p.font.SysFont("Arial", 15)  # Set the font for text display.
         # Load images for promotion options.
         for e in p_names:
             IMAGES[e] = p.transform.scale(p.image.load("img/" + e + ".png"), (75, 75))
         if self.isWhiteTurn:
             # If it's white's turn, set up the promotion options for white.
-            color = "w"
             shift = 75 * (move[0][1] - 4) if move[0][1] > 4 else 0
             # Draw the promotion selection rectangle.
-            rect = p.draw.rect(
+            p.draw.rect(
                 screen,
                 (255, 204, 117),  # Background color.
                 (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 4 * 75, 90),
                 border_radius=5,
             )
-            rect = p.draw.rect(
+            p.draw.rect(
                 screen,
                 (0, 0, 0),  # Border color.
                 (move[0][1] * 75 - shift, (move[0][0]) * 75 + 100, 300, 90),
