@@ -11,14 +11,18 @@ import sys
 import asyncio
 
 # Set up constants for the game dimensions and settings.
-WIDTH: int = 600  # The width of the game window.
+WIDTH: int = 720  # The width of the game window.
 HEIGHT: int = 600  # The height of the game window.
 MAX_FPS: int = 15  # Maximum frames per second (controls the game speed).
 AI = True
+ELO = 1320
+MOVETIME = 1000
+MOVEHINT = True
 
 # Global Game Values
 CLOCK: p.time.Clock = None  # Clock object to manage game updates.
 GameState: ChessEngine.GameState = ChessEngine.GameState()  # Initialize the game state.
+FirstMoveWhite: bool = GameState.isWhiteTurn
 MultiPV: int = 2
 Paused: bool = False
 
@@ -34,19 +38,24 @@ async def main() -> None:
     if AI:
         await subproc("stockfish.exe")
         await sendCommand(
-            f"position fen {ChessEngine.PGN.boardToPGN(GameState.board)} {"w" if GameState.isWhiteTurn else "b"} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()}",
-            False,
+            f"position fen {ChessEngine.PGN.boardToPGN(GameState.board)} {"w" if GameState.isWhiteTurn else "b"} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()}"
         )
-        await sendCommand(f"setoption name MultiPV value {MultiPV}\n", False)
+        await sendCommand(f"setoption name MultiPV value {MultiPV}\n")
+        if ELO:
+            await sendCommand("setoption name UCI_LimitStrength value True\n")
+            # TODO: Set Depth or Change Move Time to get ELO lower than 1320
+            await sendCommand(f"setoption name UCI_Elo value {ELO}\n")
     userClicks: list = []  # A list to store the user clicks.
-    toHighlight: list = []  # A list to keep track of squares to highlight.
-    possibleMoves: list = []  # A list of possible coordinates the selected piece can move to.
+    toHighlight: list = set()  # A list to keep track of squares to highlight.
+    moveHighLight: set = (
+        set()
+    )  # A list of possible coordinates the selected piece can move to.
     flipped = [False]  # False means white on bottom (if AI: AI plays black)
     drawGameState(
-        ui, screen, GameState, userClicks, toHighlight, possibleMoves, flipped
+        ui, screen, GameState, userClicks, toHighlight, moveHighLight, flipped
     )
     while True:
-        await eventHandler(ui, toHighlight, userClicks, screen, possibleMoves, flipped)
+        await eventHandler(ui, toHighlight, userClicks, screen, moveHighLight, flipped)
         CLOCK.tick(MAX_FPS)  # Control the game's frame rate.
 
 
@@ -54,9 +63,9 @@ def drawGameState(
     ui: "UI",
     screen: p.Surface,
     gs: ChessEngine.GameState,
-    draw: list,
-    highlight: list,
-    possibleMoves: list,
+    userClicks: list,
+    toHighlight: set,
+    moveHighLight: set,
     flipped: list[bool],
 ) -> None:
     """
@@ -74,19 +83,22 @@ def drawGameState(
     - possibleMoves: list
         A list of possible moves for the selected piece.
     """
-    ui.draw_board(screen, draw, highlight, possibleMoves)  # Draw the chessboard.
+    ui.draw_board(
+        screen, userClicks, toHighlight, moveHighLight if MOVEHINT else []
+    )  # Draw the chessboard.
     ui.draw_pieces(screen, gs.board, flipped[0])  # Draw the chess pieces on the board.
     screen.blit(p.transform.flip(screen, False, flipped[0]), (0, 0))
     ui.draw_places(screen, flipped[0])  # Draw the ranks and files labels.
+    ui.drawNotationLog(screen, GameState.moveLog, GameState.gameUpdate, FirstMoveWhite)
     p.display.flip()  # Update the display.
 
 
 async def eventHandler(
     ui: "UI",
-    toHighlight: list,
+    toHighlight: set,
     userClicks: list,
     screen: p.Surface,
-    possibleMoves: list,
+    possibleMoves: set,
     flipped: list[bool],
 ) -> None:
     """
@@ -103,12 +115,15 @@ async def eventHandler(
         Possible moves for the selected piece.
     """
     global Paused
-    if AI and GameState.isWhiteTurn == flipped[0] and not Paused:  # The moves if for the top opponent
+    Paused = True if GameState.gameUpdate else Paused
+    if (
+        AI and GameState.isWhiteTurn == flipped[0] and not Paused
+    ):  # The moves if for the top opponent
         await sendCommand(
             f"position fen {ChessEngine.PGN.boardToPGN(GameState.board)} {"w" if GameState.isWhiteTurn else "b"} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()}\n",
             False,
         )
-        bestToWorst = getMoves(await sendCommand("go movetime 1000\n", True))
+        bestToWorst = getMoves(await sendCommand(f"go movetime {MOVETIME}\n", True))
         move = bestToWorst[0][0]
         start, end, promote = ChessEngine.Move.parseSquare(move, GameState.board)
         handleAllMoves(
@@ -130,7 +145,7 @@ async def eventHandler(
         elif event.type == p.MOUSEBUTTONUP and event.button == 3:
             # Function to highlight selected squares on right-click.
             squareX, squareY = ui.findSquare(*p.mouse.get_pos(), flipped[0])
-            squareHighlight(squareX, squareY, toHighlight)
+            toHighlight.add((squareY, squareX))
             redraw = True
         elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
             # Handle left-click for moving pieces.
@@ -157,6 +172,10 @@ async def eventHandler(
         elif event.type == p.KEYDOWN and event.key == p.K_SPACE:
             Paused = not Paused
             print("PAUSE" if Paused else "UNPAUSE")
+        elif event.type == p.KEYDOWN and event.key == p.K_r:
+            toHighlight.clear()
+            redraw = True
+
     if redraw:
         drawGameState(
             ui, screen, GameState, userClicks, toHighlight, possibleMoves, flipped
@@ -175,26 +194,6 @@ def handleLeftButtonDown(userClicks: list) -> bool:
     return GameState.undoMove()
 
 
-def squareHighlight(x: int, y: int, toHighlight: list) -> None:
-    """
-    Adds or removes a square from the highlight list.
-
-    :Parameters:
-    - x: int
-        The x-coordinate on the board.
-    - y: int
-        The y-coordinate on the board.
-    - toHighlight: list
-        The list of squares to highlight.
-    """
-    if (y, x) not in toHighlight:
-        toHighlight.append((y, x))  # Add the square to the highlight list.
-    else:
-        toHighlight.remove(
-            (y, x)
-        )  # Remove the square from the highlight list if it's already highlighted.
-
-
 def handleSquareSelection(
     ui: "UI",
     mouseX: int,
@@ -202,7 +201,7 @@ def handleSquareSelection(
     userClicks: list,
     toHighlight: list,
     screen: p.Surface,
-    possibleMoves: list,
+    possibleMoves: set,
     flipped: list[bool],
 ) -> None:
     """
@@ -227,17 +226,17 @@ def handleSquareSelection(
         return  # Out of bounds.
     # Get the square coordinates.
     squareX, squareY = ui.findSquare(mouseX, mouseY, flipped[0])
-    if len(userClicks) == 1 and not Paused:
+    if len(userClicks) == 1:
         userClicks.append((squareY, squareX))
         # Check for castling move.
         if userClicks[0] == userClicks[1]:
             userClicks.clear()
-        elif not allowedMove(userClicks, flipped):
+        elif not allowedMove(userClicks, flipped) and not Paused:
             # Reset selection if the move is invalid.
             userClicks[0] = userClicks[1]
             del userClicks[1]  # Delete the item at index 1.
             highlightPosMoves(userClicks, screen, possibleMoves)
-        else:
+        elif not Paused:
             handleAllMoves(ui, userClicks, toHighlight, screen, possibleMoves, flipped)
     elif len(userClicks) == 2:
         userClicks.clear()
@@ -251,7 +250,7 @@ def handleSquareSelection(
 def handleAllMoves(
     ui: "UI",
     userClicks: list,
-    toHighlight: list,
+    toHighlight: set,
     screen: p.Surface,
     possibleMoves: list,
     flipped: list[bool],
@@ -270,7 +269,7 @@ def handleAllMoves(
         handleMove(userClicks)
 
 
-def highlightPosMoves(piece: list, screen: p.Surface, possibleMoves: list) -> None:
+def highlightPosMoves(piece: list, screen: p.Surface, possibleMoves: set) -> None:
     """
     Highlights possible moves for the selected piece.
 
@@ -283,9 +282,9 @@ def highlightPosMoves(piece: list, screen: p.Surface, possibleMoves: list) -> No
         Possible moves for the selected piece.
     """
     piece = piece[0]
-    for toP, fromP in GameState.posMoves:
+    for toP, fromP in GameState.possibleMoves:
         if piece == fromP:
-            possibleMoves.append(toP)
+            possibleMoves.add(toP)
 
 
 def enPassantChecks(userClicks: list) -> bool:
@@ -336,8 +335,8 @@ def handlePawnPromotion(
     ui: "UI",
     userClicks: list,
     screen: p.Surface,
-    toHighlight: list,
-    possibleMoves: list,
+    toHighlight: set,
+    possibleMoves: set,
     flipped: list[bool],
     promote: str,
 ) -> None:
@@ -430,7 +429,7 @@ async def subproc(path):
         await terminateProgram("Stockfish did not respond as expected!")
 
 
-async def sendCommand(command: str, outputNeeded: bool):
+async def sendCommand(command: str, outputNeeded: bool = False):
     # send command
     stockfish.stdin.write(command.encode("ascii"))
     await stockfish.stdin.drain()
@@ -455,7 +454,7 @@ def allowedMove(userClicks: list[tuple[int]], flipped: list[bool]):
     :Returns:
     - isAllowed: bool
     """
-    if (userClicks[1], userClicks[0]) not in GameState.posMoves:
+    if (userClicks[1], userClicks[0]) not in GameState.possibleMoves:
         return False
     if not AI:
         return True

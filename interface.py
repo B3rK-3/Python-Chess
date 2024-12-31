@@ -1,13 +1,18 @@
 import pygame as p
 import pygame.font
+from ChessEngine import Move
 
 # Set up constants for the game dimensions and settings.
 SIZE: int = 8  # The size of the chessboard (8x8).
 LIGHT_SQUARE_COLOR: p.Color = p.Color(227, 193, 111)  # Light square color.
 DARK_SQUARE_COLOR: p.Color = p.Color(184, 139, 74)  # Dark square color.
-HIGHLIGHT_COLOR: tuple = (255, 255, 102, 100)  # Color for highlighting squares.
-MOVE_HIGHLIGHT_COLOR: tuple = (255, 255, 102, 200)  # Color for move highlights.
-POSSIBLE_MOVES: tuple = (255, 255, 0, 128)  # Color for possible moves highlights.
+HIGHLIGHT_COLOR: tuple = (255, 255, 0, 100)  # Color for highlighting squares.
+CLICK_HIGHLIGHT_COLOR: tuple = (255, 255, 102, 0)  # Color for click highlights.
+POSSIBLE_MOVES: tuple = (255, 255, 130, 150)  # Color for possible moves highlights.
+NOTATION_COLOR: p.Color = p.Color(
+    255, 255, 255, 255
+)  # Color for notation log on the side
+BACKGROUND_COLOR: p.color = p.Color(122, 122, 115)  # color for background
 
 
 class UI:
@@ -43,14 +48,12 @@ class UI:
         for piece in p_names:
             # Load and scale the image for each piece, then store it in the IMAGES dictionary.
             self.IMAGES[piece] = p.transform.scale(
-                p.image.load(
-                    f"./img/{piece}.png"
-                ),
+                p.image.load(f"./img/{piece}.png"),
                 (self.SQ_EACH_SIZE, self.SQ_EACH_SIZE),
             )
 
     def draw_board(
-        self, screen: p.Surface, draw: list, highlight: list, possibleMoves: list
+        self, screen: p.Surface, userClicks: list, highlight: set, possibleMoves: set
     ) -> None:
         """
         Draws the chessboard with highlighted squares.
@@ -65,6 +68,7 @@ class UI:
         - possibleMoves: list
             Possible moves for the selected piece.
         """
+        highlight = highlight - possibleMoves
         colors = [
             LIGHT_SQUARE_COLOR,
             DARK_SQUARE_COLOR,
@@ -73,7 +77,7 @@ class UI:
             for c in range(SIZE):
                 modified = False
                 color = colors[(r + c) % 2]  # Alternate color based on row and column.
-                if (r, c) in draw:
+                if (r, c) in userClicks:
                     p.draw.rect(
                         screen,
                         color,
@@ -84,7 +88,7 @@ class UI:
                             self.SQ_EACH_SIZE,
                         ),
                     )
-                    color = MOVE_HIGHLIGHT_COLOR
+                    color = CLICK_HIGHLIGHT_COLOR
                     modified = True
                 if modified:
                     # Create a semi-transparent surface for highlights.
@@ -195,6 +199,72 @@ class UI:
                             self.SQ_EACH_SIZE,
                         ),
                     )
+
+    def drawNotationLog(
+        self,
+        screen: p.Surface,
+        moveLog: list[Move],
+        gameUpdate: str,
+        FirstMoveWhite: bool,
+    ):
+        p.draw.rect(
+            screen,
+            BACKGROUND_COLOR,
+            (self.height, 0, self.width - self.height, self.height),
+        )
+        font = p.font.SysFont("Arial", 15)
+        x = self.height + 10
+        y = 30
+        # to indicate who was the first one to move
+        if FirstMoveWhite:
+            firstMoverText = "WHITE"
+            firstMoverColor = p.Color(255, 255, 255)
+            secondMoverText = "BLACK"
+            secondMoverColor = p.Color(0, 0, 0)
+        else:
+            firstMoverText = "BLACK"
+            firstMoverColor = p.Color(0, 0, 0)
+            secondMoverText = "WHITE"
+            secondMoverColor = p.Color(255, 255, 255)
+        firstMover = p.font.SysFont("Arial", 15, True).render(
+            firstMoverText, True, firstMoverColor
+        )
+        secondMover = p.font.SysFont("Arial", 15, True).render(
+            secondMoverText, True, secondMoverColor
+        )
+        screen.blit(firstMover, (self.height + 10, 10))
+        screen.blit(secondMover, (self.height + 70, 10))
+        # need to iterate each move and render it everytime its called
+        for i in range(len(moveLog)):
+            move = moveLog[i]
+            leftOrRight = i % 2
+            notation = font.render(
+                move.__str__(),
+                True,
+                firstMoverColor if not leftOrRight else secondMoverColor,
+            )
+            y1 = y + (20 * (i // 2))
+            x1 = x + (60 * leftOrRight)
+            screen.blit(notation, (x1, y1))
+        # Need to let to user know that its a mate or a stalemate
+        if gameUpdate:
+            font = p.font.SysFont("Arial", 20)
+            update = font.render(
+                "CHECKMATE" if gameUpdate == "GG" else "STALEMATE", True, NOTATION_COLOR
+            )
+            screen.blit(
+                update,
+                (
+                    self.height + (self.width - self.height) // 2 - 50,
+                    y
+                    + (
+                        len(moveLog) // 2
+                        if len(moveLog) // 2 == len(moveLog) / 2
+                        else len(moveLog) // 2 + 1
+                    )
+                    * 20,
+                ),
+            )
 
     def setPyGameValues(self) -> p.Surface:
         """
