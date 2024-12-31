@@ -532,16 +532,15 @@ class GameState:
                 )
         else:
             # If it's black's turn, set up the promotion options for black.
-            color = "b"
             shift = 75 * (move[0][1] - 4) if move[0][1] > 4 else 0
             # Draw the promotion selection rectangle.
-            rect = p.draw.rect(
+            p.draw.rect(
                 screen,
                 (255, 204, 117),  # Background color.
                 (move[0][1] * 75 - shift, (move[0][0]) * 75 - 100, 4 * 75, 90),
                 border_radius=5,
             )
-            rect = p.draw.rect(
+            p.draw.rect(
                 screen,
                 (0, 0, 0),  # Border color.
                 (move[0][1] * 75 - shift, (move[0][0]) * 75 - 100, 300, 90),
