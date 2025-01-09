@@ -5,7 +5,7 @@ Main.py file is responsible for running the game engine. It handles user input a
 import pygame as p
 import pygame.font
 import ChessEngine
-from interface import UI
+from Interface import UI
 import inspect
 import sys
 import asyncio
@@ -38,7 +38,7 @@ async def main() -> None:
     if AI:
         await subproc("stockfish.exe")
         await sendCommand(
-            f"position fen {ChessEngine.PGN.boardToPGN(GameState.board)} {"w" if GameState.isWhiteTurn else "b"} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()}"
+            f"position fen {ChessEngine.FEN.boardToFEN(GameState.board)} {'w' if GameState.isWhiteTurn else 'b'} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()}"
         )
         await sendCommand(f"setoption name MultiPV value {MultiPV}\n")
         if ELO:
@@ -83,12 +83,12 @@ def drawGameState(
     - possibleMoves: list
         A list of possible moves for the selected piece.
     """
-    ui.draw_board(
+    ui.drawBoard(
         screen, userClicks, toHighlight, moveHighLight if MOVEHINT else []
     )  # Draw the chessboard.
-    ui.draw_pieces(screen, gs.board, flipped[0])  # Draw the chess pieces on the board.
+    ui.drawPieces(screen, gs.board, flipped[0])  # Draw the chess pieces on the board.
     screen.blit(p.transform.flip(screen, False, flipped[0]), (0, 0))
-    ui.draw_places(screen, flipped[0])  # Draw the ranks and files labels.
+    ui.drawPlaces(screen, flipped[0])  # Draw the ranks and files labels.
     ui.drawNotationLog(screen, GameState.moveLog, GameState.gameUpdate, FirstMoveWhite)
     p.display.flip()  # Update the display.
 
@@ -120,7 +120,7 @@ async def eventHandler(
         AI and GameState.isWhiteTurn == flipped[0] and not Paused
     ):  # The moves if for the top opponent
         await sendCommand(
-            f"position fen {ChessEngine.PGN.boardToPGN(GameState.board)} {"w" if GameState.isWhiteTurn else "b"} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()}\n",
+            f"position fen {ChessEngine.FEN.boardToFEN(GameState.board)} {'w' if GameState.isWhiteTurn else 'b'} {GameState.getCastleString()} {GameState.enPassantPlace} {GameState.fiftyMoveRule} {GameState.numOfMoves()}\n",
             False,
         )
         bestToWorst = getMoves(await sendCommand(f"go movetime {MOVETIME}\n", True))

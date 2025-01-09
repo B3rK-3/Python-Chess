@@ -52,7 +52,7 @@ class UI:
                 (self.SQ_EACH_SIZE, self.SQ_EACH_SIZE),
             )
 
-    def draw_board(
+    def drawBoard(
         self, screen: p.Surface, userClicks: list, highlight: set, possibleMoves: set
     ) -> None:
         """
@@ -137,7 +137,7 @@ class UI:
             # Draw the transparent rectangle on the screen.
             screen.blit(overlay, (c * self.SQ_EACH_SIZE, r * self.SQ_EACH_SIZE))
 
-    def draw_places(self, screen: p.Surface, flipped: bool = False) -> None:
+    def drawPlaces(self, screen: p.Surface, flipped: bool = False) -> None:
         """
         Draws the rank (numbers) and file (letters) labels on the board.
 
@@ -171,7 +171,7 @@ class UI:
             screen.blit(f, (1, 75 * (9 - i) - 75))
             white = 1 - white  # Alternate the color.
 
-    def draw_pieces(
+    def drawPieces(
         self, screen: p.Surface, board: list, flipped: bool = False
     ) -> None:
         """

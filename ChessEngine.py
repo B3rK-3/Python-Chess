@@ -215,7 +215,7 @@ class GameState:
             abs(moveObj.moverEndSq[0] - moveObj.moverStartSq[0]) == 2
             and moveObj.pieceMoved[1] == "P"
         ):
-            self.enPassantPlace = Move.get_square(
+            self.enPassantPlace = Move.getSqaure(
                 (
                     moveObj.moverEndSq[0] + (1 if not self.isWhiteTurn else -1),
                     moveObj.moverEndSq[1],
@@ -878,7 +878,7 @@ class GameState:
                         if locOwnColor:
                             # An opponent's piece is behind our own piece, which might be pinned.
                             print(
-                                f"Possible Pin - Pinner: {Move.get_square((r,c))} - Dir: {move} - Pinner: {piece}"
+                                f"Possible Pin - Pinner: {Move.getSqaure((r,c))} - Dir: {move} - Pinner: {piece}"
                             )
                             self.pinned((r, c), locOwnColor, move, piece[1], toDelete)
                             locOwnColor = False
@@ -887,13 +887,13 @@ class GameState:
                         elif (c_off == 0 or r_off == 0) and (pType in "RQ"):
                             # Straight line checks (rook or queen).
                             print(
-                                f"Rem Move - Square: {Move.get_square((r,c))} - Dir: {move} - Piece: {piece[1]}"
+                                f"Rem Move - Square: {Move.getSqaure((r,c))} - Dir: {move} - Piece: {piece[1]}"
                             )
                             self.remMoves(r, c, True, toDelete, king)
                         elif (c_off != 0 and r_off != 0) and (pType in "BQ"):
                             # Diagonal checks (bishop or queen).
                             print(
-                                f"Rem Move - Square: {Move.get_square((r, c))} - Dir: {move} - Piece: {piece[1]}"
+                                f"Rem Move - Square: {Move.getSqaure((r, c))} - Dir: {move} - Piece: {piece[1]}"
                             )
                             self.remMoves(r, c, False, toDelete, king)
                         elif (
@@ -902,7 +902,7 @@ class GameState:
                         ) and (pType == "P"):
                             # Check for pawn checks.
                             print(
-                                f"Rem Move - Square: {Move.get_square((r, c))} - Dir: {move} - Piece: {piece[1]}"
+                                f"Rem Move - Square: {Move.getSqaure((r, c))} - Dir: {move} - Piece: {piece[1]}"
                             )
                             self.remMoves(r, c, False, toDelete, king)
                         else:
@@ -1258,27 +1258,27 @@ class Move:
         elif self.type == 3:
             if self.isPieceCaptured:
                 return (
-                    f"{self.get_square(self.moverStartSq)}x{self.get_square(self.moverEndSq)}={self.promotedTo}"
+                    f"{self.getSqaure(self.moverStartSq)}x{self.getSqaure(self.moverEndSq)}={self.promotedTo}"
                     + self.checkOrMate
                 )
             else:
                 return (
-                    f"{self.get_square(self.moverStartSq)}={self.promotedTo}"
+                    f"{self.getSqaure(self.moverStartSq)}={self.promotedTo}"
                     + self.checkOrMate
                 )
         elif self.type == 2 or self.isPieceCaptured:
             return (
-                f"{self.get_square(self.moverStartSq)}x{self.get_square(self.moverEndSq)}"
+                f"{self.getSqaure(self.moverStartSq)}x{self.getSqaure(self.moverEndSq)}"
                 + self.checkOrMate
             )
         else:
             return (
-                f"{self.get_square(self.moverStartSq)}{self.get_square(self.moverEndSq)}"
+                f"{self.getSqaure(self.moverStartSq)}{self.getSqaure(self.moverEndSq)}"
                 + self.checkOrMate
             )
 
     @staticmethod
-    def get_square(sq: tuple) -> str:
+    def getSqaure(sq: tuple) -> str:
         """
         Convert a (row, col) tuple to chess square notation.
 
@@ -1310,9 +1310,9 @@ class Move:
         return (start, end, promote)
 
 
-class PGN:
+class FEN:
     @staticmethod
-    def boardToPGN(board: list[str]):
+    def boardToFEN(board: list[str]):
         pgn = ""
         for row in board:
             skipAmount = 0
@@ -1330,7 +1330,7 @@ class PGN:
         return pgn[:-1]
 
     @staticmethod
-    def PGNtoBoard(pgn: str):
+    def FENtoBoard(pgn: str):
         board = [["__"] * 8 for _ in range(8)]
         i = 0
         row = 0
